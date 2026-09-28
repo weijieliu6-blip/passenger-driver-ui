@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone } from 'lucide-react'
+import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone, ClipboardList } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { useT } from '@/components/i18n-provider'
 
@@ -557,28 +557,32 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-slate-50">{t('home.page_title')}</h1>
             <p className="text-sm text-slate-400 mt-1">{t('home.page_subtitle')}</p>
           </div>
-          
-          {/* 右上角用户入口 */}
-          <div className="flex items-center gap-3">
-            <LocaleSwitcher />
+
+          {/* 右上角用户入口 — 圖標式 */}
+          <div className="flex items-center gap-2">
+            {/* 語言切換（圖標） */}
+            <LocaleSwitcher iconOnly />
+
+            {/* 我的訂單（僅登入後顯示） */}
             {authState === 'passenger' && (
               <button
                 onClick={() => router.push('/passenger/orders')}
-                className="text-slate-300 text-sm font-medium hover:text-cyan-400 transition-colors"
+                aria-label={t('nav.my_orders')}
+                title={t('nav.my_orders')}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-800/80 backdrop-blur-sm border border-slate-700 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 transition-all"
               >
-                {t('nav.my_orders')}
+                <ClipboardList className="w-4 h-4" />
               </button>
             )}
+
+            {/* 個人中心 / 登入 — 圓形頭像按鈕 */}
             <button
               onClick={handleUserButtonClick}
-              className="group flex items-center gap-2 px-4 py-2 bg-slate-800/90 backdrop-blur-sm border border-slate-700 hover:border-cyan-500/50 rounded-full transition-all duration-200 hover:bg-slate-800"
+              aria-label={authState === 'passenger' ? t('nav.profile') : t('nav.login')}
+              title={authState === 'passenger' ? t('nav.profile') : t('nav.login')}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 transition-all hover:scale-105 shadow-md shadow-cyan-500/20"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-slate-300 text-sm font-medium group-hover:text-cyan-400 transition-colors">
-                {authState === 'passenger' ? t('nav.profile') : t('nav.login')}
-              </span>
+              <User className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>

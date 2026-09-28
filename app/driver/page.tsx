@@ -147,9 +147,21 @@ export default function DriverRecruitPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-900/20 via-slate-900 to-slate-900">
-      {/* 頂部語言切換 */}
-      <div className="absolute top-4 right-4 z-30">
-        <LocaleSwitcher />
+      {/* 右上角：icon-only 語言切換 + 返回主頁按鈕 */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        <LocaleSwitcher iconOnly />
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          aria-label="返回主頁"
+          title="返回主頁"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-slate-800/50 border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-500 transition-all"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </button>
       </div>
 
       {/* Hero */}
