@@ -26,8 +26,13 @@ interface Order {
   created_at: string
   driver_name?: string
   driver_phone?: string
+  driver_plate?: string
   rating?: number
-  completed_at?: string
+  completed_at?: string | null
+  cancelled_at?: string | null
+  grabbed_at?: string | null
+  confirmed_price?: number | null
+  price_currency?: string | null
 }
 
 type TabType = 'active' | 'cancelled' | 'history'
@@ -102,8 +107,8 @@ export default function PassengerProfilePage() {
 
   // 取消訂單
   const handleCancelOrder = async (order: Order) => {
-    const confirmMsg = order.status === 'grabbed' 
-      ? `訂單 #${order.order_number} 已被司機接單，確定要取消嗎？\n\n注意：取消已接單的訂單可能會影響您的信用`
+    const confirmMsg = (order.status === 'grabbed' || order.status === 'price_confirmed')
+      ? `訂單 #${order.order_number} 已被司機接單並報價，確定要取消嗎？\n\n注意：取消已接單的訂單可能會影響您的信用`
       : `確定要取消訂單 #${order.order_number} 嗎？`
     
     if (!confirm(confirmMsg)) return
@@ -167,27 +172,35 @@ export default function PassengerProfilePage() {
 
     switch (activeTab) {
       case 'active':
-        // 進行中：待接單、已接單
-        return orders.filter(o => o.status === 'pending' || o.status === 'grabbed')
-      
+        // 進行中：待接單、已接單、已報價（任何「未結束」的訂單）
+        return orders.filter(o =>
+          o.status === 'pending' ||
+          o.status === 'grabbed' ||
+          o.status === 'price_confirmed'
+        )
+
       case 'cancelled':
-        // 已取消：7天內取消的
+        // 已取消：7天內取消的（用 cancelled_at 判斷）
         return orders.filter(o => {
           if (o.status !== 'cancelled') return false
-          const cancelDate = new Date(o.completed_at || o.created_at)
+          const cancelDate = new Date(o.cancelled_at || o.created_at)
           return cancelDate >= oneWeekAgo
         })
-      
+
       case 'history':
         // 歷史：14天前完成的 + 14天前的已取消
         return orders.filter(o => {
-          if (o.status === 'completed' || o.status === 'cancelled') {
+          if (o.status === 'completed') {
             const orderDate = new Date(o.completed_at || o.created_at)
+            return orderDate < fourteenDaysAgo
+          }
+          if (o.status === 'cancelled') {
+            const orderDate = new Date(o.cancelled_at || o.created_at)
             return orderDate < fourteenDaysAgo
           }
           return false
         })
-      
+
       default:
         return []
     }
@@ -235,6 +248,7 @@ export default function PassengerProfilePage() {
     const map: Record<string, { label: string, color: string }> = {
       'pending': { label: '待接單', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
       'grabbed': { label: '已接單', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
+      'price_confirmed': { label: '已報價', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
       'completed': { label: '已完成', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
       'cancelled': { label: '已取消', color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
     }
@@ -265,7 +279,9 @@ export default function PassengerProfilePage() {
     return null
   }
 
-  const totalActive = orders.filter(o => o.status === 'pending' || o.status === 'grabbed').length
+  const totalActive = orders.filter(o =>
+    o.status === 'pending' || o.status === 'grabbed' || o.status === 'price_confirmed'
+  ).length
   const totalCancelled = orders.filter(o => o.status === 'cancelled').length
 
   return (
@@ -454,9 +470,9 @@ export default function PassengerProfilePage() {
                           待評分
                         </button>
                       )}
-                      {order.status === 'grabbed' && (order as any).confirmed_price && (
+                      {(order.status === 'grabbed' || order.status === 'price_confirmed') && order.confirmed_price && (
                         <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded">
-                          {(order as any).price_currency === 'CNY' ? '¥' : 'HK$'}{(order as any).confirmed_price}
+                          💰 {order.price_currency === 'CNY' ? '¥' : 'HK$'}{order.confirmed_price}
                         </span>
                       )}
                     </div>
@@ -486,7 +502,7 @@ export default function PassengerProfilePage() {
                   )}
 
                   {/* 訂單操作按鈕 */}
-                  {(order.status === 'pending' || order.status === 'grabbed') && (
+                  {(order.status === 'pending' || order.status === 'grabbed' || order.status === 'price_confirmed') && (
                     <div className="mt-3 pt-3 border-t border-slate-700/50 flex gap-2 justify-end">
                       {order.status === 'pending' && (
                         <Link
