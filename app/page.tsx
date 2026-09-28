@@ -884,6 +884,7 @@ export default function HomePage() {
                       dropoffLocations={dropoffMapLocations}
                       dropoffName={formData.dropoffArea || null}
                       onDropoffSelect={(loc) => setFormData({ ...formData, dropoffArea: loc.name })}
+                      pickupTime={formData.departureTime || null}
                     />
                   </div>
                 )

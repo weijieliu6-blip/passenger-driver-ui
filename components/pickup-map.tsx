@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo } from 'react'
+import { Clock } from 'lucide-react'
 import type { LocationCoord } from '@/lib/location-coords'
 import { getCenterOfLocations } from '@/lib/location-coords'
 
@@ -116,6 +117,9 @@ interface PickupMapProps {
   dropoffName?: string | null
   onDropoffSelect?: (loc: LocationCoord) => void
 
+  /** 用戶選擇的出發時間（HH:MM），可選，用於推算抵達時間 */
+  pickupTime?: string | null
+
   /** 地圖高度 */
   height?: string
 }
@@ -169,6 +173,71 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
+/**
+ * 跨境判斷：起點在 HK、終點在內地（或反之）→ 跨境
+ * 簡化：座標 lng < 114.0 為內地，>= 114.0 為 HK
+ */
+function isCrossBorder(
+  pickup: { lat: number; lng: number } | undefined,
+  dropoff: { lat: number; lng: number } | undefined
+): boolean {
+  if (!pickup || !dropoff) return false
+  const isPickupHK = pickup.lng >= 114.0
+  const isDropoffHK = dropoff.lng >= 114.0
+  return isPickupHK !== isDropoffHK
+}
+
+/**
+ * 計算預計行程時間（分鐘）
+ * - 平均市區速度 35 km/h
+ * - 高速公路 60 km/h
+ * - 跨境額外加 30 分鐘（過關+口岸排隊）
+ * - 起點接送緩衝 5 分鐘
+ *
+ * 返回 { driveMinutes, totalMinutes, breakdown }
+ */
+function calculateETA(
+  pickup: { lat: number; lng: number } | undefined,
+  dropoff: { lat: number; lng: number } | undefined
+): { driveMinutes: number; totalMinutes: number; breakdown: string[] } | null {
+  if (!pickup || !dropoff) return null
+  const distanceKm = haversineKm(pickup, dropoff)
+  if (distanceKm < 0.1) {
+    return { driveMinutes: 5, totalMinutes: 10, breakdown: ['市內 5 分鐘'] }
+  }
+
+  // 簡單距離分段
+  let avgSpeed = 35
+  let roadType = '市區道路'
+  if (distanceKm > 30) {
+    avgSpeed = 60
+    roadType = '高速+市區'
+  } else if (distanceKm > 15) {
+    avgSpeed = 45
+    roadType = '快速路'
+  }
+  const driveMinutes = Math.round((distanceKm / avgSpeed) * 60)
+
+  const breakdown: string[] = []
+  breakdown.push(`${roadType} 約 ${driveMinutes} 分鐘`)
+
+  let total = driveMinutes
+
+  // 起點接送緩衝
+  const pickupBuffer = 5
+  total += pickupBuffer
+  breakdown.push(`接送 ${pickupBuffer} 分鐘`)
+
+  // 跨境過關
+  if (isCrossBorder(pickup, dropoff)) {
+    const borderWait = 30
+    total += borderWait
+    breakdown.push(`跨境通關 ${borderWait} 分鐘`)
+  }
+
+  return { driveMinutes, totalMinutes: total, breakdown }
+}
+
 export default function PickupMap({
   pickupLocations,
   pickupName,
@@ -176,6 +245,7 @@ export default function PickupMap({
   dropoffLocations,
   dropoffName,
   onDropoffSelect,
+  pickupTime,
   height = '320px',
 }: PickupMapProps) {
   // 找到選定點的完整座標
@@ -206,6 +276,32 @@ export default function PickupMap({
     if (!pickupCoord || !dropoffCoord) return null
     return haversineKm(pickupCoord, dropoffCoord)
   }, [pickupCoord, dropoffCoord])
+
+  // 預計行程時間 + 抵達時間
+  const eta = useMemo(() => {
+    if (!pickupCoord || !dropoffCoord) return null
+    return calculateETA(pickupCoord, dropoffCoord)
+  }, [pickupCoord, dropoffCoord])
+
+  // 抵達時間 = 出發時間 + ETA
+  const arrivalTime = useMemo(() => {
+    if (!eta || !pickupTime) return null
+    const match = pickupTime.match(/^(\d{1,2}):(\d{2})$/)
+    if (!match) return null
+    const h = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    const total = h * 60 + m + eta.totalMinutes
+    const arrH = Math.floor((total / 60) % 24)
+    const arrM = total % 60
+    // 跨日時提示
+    const crossDay = total >= 24 * 60
+    return {
+      h: arrH,
+      m: arrM,
+      label: `${arrH.toString().padStart(2, '0')}:${arrM.toString().padStart(2, '0')}`,
+      crossDay,
+    }
+  }, [eta, pickupTime])
 
   // 全部「候選」marker
   const extraPoints: LocationCoord[] = useMemo(
@@ -343,11 +439,41 @@ export default function PickupMap({
           )}
         </MapContainer>
 
-        {/* 右上角浮層：距離估算 */}
-        {distanceKm !== null && (
-          <div className="absolute top-3 right-3 z-[400] bg-slate-900/85 backdrop-blur border border-slate-700/70 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-            <span className="text-cyan-400">●</span>
-            距離 <span className="font-semibold text-cyan-300">{distanceKm.toFixed(1)} km</span>
+        {/* 右上角浮層：距離 + 預計行程時間 + 抵達時間 */}
+        {(distanceKm !== null || eta) && (
+          <div className="absolute top-3 right-3 z-[400] space-y-1.5">
+            {eta && (
+              <div className="bg-slate-900/90 backdrop-blur border border-cyan-700/60 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                預計行程
+                <span className="font-semibold text-cyan-300">
+                  {eta.totalMinutes} 分鐘
+                </span>
+                {isCrossBorder(pickupCoord, dropoffCoord) && (
+                  <span className="ml-1 text-amber-400 text-[10px]">
+                    ·含通關
+                  </span>
+                )}
+              </div>
+            )}
+            {arrivalTime && (
+              <div className="bg-slate-900/90 backdrop-blur border border-emerald-700/60 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                <span className="text-emerald-400">⏰</span>
+                抵達時間
+                <span className="font-semibold text-emerald-300">
+                  {arrivalTime.label}
+                </span>
+                {arrivalTime.crossDay && (
+                  <span className="text-amber-400 text-[10px]">·翌日</span>
+                )}
+              </div>
+            )}
+            {distanceKm !== null && (
+              <div className="bg-slate-900/85 backdrop-blur border border-slate-700/70 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
+                <span className="text-cyan-400">●</span>
+                距離 <span className="font-semibold text-cyan-300">{distanceKm.toFixed(1)} km</span>
+              </div>
+            )}
           </div>
         )}
       </div>
