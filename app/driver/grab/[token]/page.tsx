@@ -101,6 +101,8 @@ export default function DriverGrabPage() {
     const url = new URL(window.location.href)
     const querySid = url.searchParams.get('staff_id') ?? ''
     setStaffIdInput(querySid)
+    // 如果 URL 已經帶 staff_id（從分享連結帶來），直接用
+    if (querySid) setStaffId(querySid)
 
     // 嘗試從釘釘 JS SDK 自動拿到 userId
     // 僅在釘釘 H5 內開啟時才會成功（window.dd 是釘釘注入的全局變數）
