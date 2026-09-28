@@ -166,10 +166,6 @@ export default function PassengerProfilePage() {
 
   // 過濾訂單
   const getFilteredOrders = () => {
-    const now = new Date()
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
-
     switch (activeTab) {
       case 'active':
         // 進行中：待接單、已接單、已報價（任何「未結束」的訂單）
@@ -180,26 +176,12 @@ export default function PassengerProfilePage() {
         )
 
       case 'cancelled':
-        // 已取消：7天內取消的（用 cancelled_at 判斷）
-        return orders.filter(o => {
-          if (o.status !== 'cancelled') return false
-          const cancelDate = new Date(o.cancelled_at || o.created_at)
-          return cancelDate >= oneWeekAgo
-        })
+        // 已取消：所有已取消訂單（不論時間）
+        return orders.filter(o => o.status === 'cancelled')
 
       case 'history':
-        // 歷史：14天前完成的 + 14天前的已取消
-        return orders.filter(o => {
-          if (o.status === 'completed') {
-            const orderDate = new Date(o.completed_at || o.created_at)
-            return orderDate < fourteenDaysAgo
-          }
-          if (o.status === 'cancelled') {
-            const orderDate = new Date(o.cancelled_at || o.created_at)
-            return orderDate < fourteenDaysAgo
-          }
-          return false
-        })
+        // 歷史：所有已完成的訂單
+        return orders.filter(o => o.status === 'completed')
 
       default:
         return []
@@ -414,9 +396,9 @@ export default function PassengerProfilePage() {
 
           {/* Tab 說明 */}
           <div className="mb-4 text-sm text-slate-500">
-            {activeTab === 'active' && '顯示正在等待接單或已成功接單的訂單'}
-            {activeTab === 'cancelled' && '顯示近一週取消的訂單'}
-            {activeTab === 'history' && '顯示超過14天的已完成/已取消訂單'}
+            {activeTab === 'active' && '顯示正在等待接單、已接單或已報價的訂單'}
+            {activeTab === 'cancelled' && '顯示所有已取消的訂單（含取消原因與重新預約）'}
+            {activeTab === 'history' && '顯示所有已完成的訂單（含評分入口）'}
           </div>
           
           {filteredOrders.length === 0 ? (
