@@ -1,0 +1,13 @@
+// 確認訂單詳情
+const res = await fetch('http://localhost:3000/api/orders/ORD20260919004')
+const data = await res.json()
+console.log('訂單 #ORD20260919004 當前詳情:')
+console.log('車型:', data.order.vehicle_type)
+console.log('人數:', data.order.passengers)
+console.log('行李:', data.order.luggage)
+console.log('時間:', data.order.departure_time)
+console.log('包車:', data.order.is_charter)
+console.log('孩童:', data.order.has_child)
+console.log('孩童類型:', data.order.child_type)
+console.log('備註:', data.order.passenger_notes)
+console.log('狀態:', data.order.status)

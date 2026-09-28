@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
         id: order.id,
         orderNumber: order.order_number,
         status: order.status,
+        grabToken: order.grab_token,
+        grabTokenExpiresAt: order.grab_token_expires_at,
         createdAt: order.created_at
       }
     })
