@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
         passengerPhone: order.passenger_phone,
         estimatedFare: body.estimatedFare ?? null,
         remark: order.passenger_notes ?? '',
-      })
+        testMode: body.testMode === true,
+      } as any)
 
       if (notificationResult.success) {
         console.log('✅ 钉钉纯文字推送成功:', order.order_number)

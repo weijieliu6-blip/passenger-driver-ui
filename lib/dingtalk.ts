@@ -142,8 +142,13 @@ export async function pushOrderText(opts: {
         ? '跨境專車：香港 → 內地'
         : '跨境專車'
 
+  // [測試模式] 若 body.testMode=true 則加 [測試] 前綴，方便測試訂單辨識
+  const isTest = (opts as any).testMode === true
+  const headerLine = isTest ? '🧪 [測試] 新訂單 - 待接單' : '🚗 新訂單 - 待接單'
+  // 注意：testMode 從呼叫端傳入（由 API route 從 request body 讀取）
+
   const text = [
-    '🚗 新訂單 - 待接單',
+    headerLine,
     '─────────────────',
     `📋 行程方向：${directionText}`,
     `🕐 出發時間：${opts.pickupTime}`,
