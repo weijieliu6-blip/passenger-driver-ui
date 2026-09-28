@@ -1,0 +1,14 @@
+{
+  "direction": "hk_to_mainland",
+  "pickupLocation": "香港",
+  "pickupArea": "九龍",
+  "dropoffLocation": "汕尾",
+  "dropoffArea": "汕尾城區",
+  "departureTime": "2026-09-28 16:00",
+  "passengers": 3,
+  "luggage": 2,
+  "vehicleType": "7_seat",
+  "passengerName": "E2E雙搶",
+  "passengerPhone": "13800138001",
+  "estimatedFare": 600
+}
