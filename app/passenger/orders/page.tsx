@@ -19,6 +19,16 @@ interface Order {
   vehicle_type: string
   driver_name: string | null
   driver_phone: string | null
+  driver_plate: string | null
+  confirmed_price: number | null
+  price_currency: string | null
+  price_confirmed_at: string | null
+  estimated_fare: number | null
+  service_type: string | null
+  direction: string | null
+  is_charter: boolean | null
+  has_child: boolean | null
+  passenger_notes: string | null
   created_at: string
 }
 
@@ -148,37 +158,44 @@ function PassengerOrdersContent() {
 
   const getStatusInfo = (status: string) => {
     const statusMap: Record<string, { text: string; bgClass: string; textClass: string; icon: any; gradient: string }> = {
-      pending: { 
-        text: '待接單', 
-        bgClass: 'bg-amber-500/20', 
+      pending: {
+        text: '待接單',
+        bgClass: 'bg-amber-500/20',
         textClass: 'text-amber-300',
         icon: Clock,
         gradient: 'from-amber-500/10 to-orange-500/10 border-amber-500/30'
       },
-      grabbed: { 
-        text: '已接單', 
-        bgClass: 'bg-emerald-500/20', 
+      grabbed: {
+        text: '已接單',
+        bgClass: 'bg-emerald-500/20',
         textClass: 'text-emerald-300',
         icon: CheckCircle2,
         gradient: 'from-emerald-500/10 to-teal-500/10 border-emerald-500/30'
       },
-      completed: { 
-        text: '已完成', 
-        bgClass: 'bg-slate-500/20', 
+      price_confirmed: {
+        text: '已報價',
+        bgClass: 'bg-yellow-500/20',
+        textClass: 'text-yellow-300',
+        icon: CheckCircle2,
+        gradient: 'from-yellow-500/15 to-amber-500/10 border-yellow-500/40'
+      },
+      completed: {
+        text: '已完成',
+        bgClass: 'bg-slate-500/20',
         textClass: 'text-slate-300',
         icon: CheckCircle2,
         gradient: 'from-slate-500/10 to-slate-600/10 border-slate-500/30'
       },
-      cancelled: { 
-        text: '已取消', 
-        bgClass: 'bg-red-500/20', 
+      cancelled: {
+        text: '已取消',
+        bgClass: 'bg-red-500/20',
         textClass: 'text-red-300',
         icon: X,
         gradient: 'from-red-500/10 to-pink-500/10 border-red-500/30'
       },
-      expired: { 
-        text: '已過期', 
-        bgClass: 'bg-slate-500/20', 
+      expired: {
+        text: '已過期',
+        bgClass: 'bg-slate-500/20',
         textClass: 'text-slate-300',
         icon: Clock,
         gradient: 'from-slate-500/10 to-slate-600/10 border-slate-500/30'
@@ -364,9 +381,10 @@ function PassengerOrdersContent() {
                 : order.dropoff_location
 
               return (
-                <div
+                <Link
                   key={order.id}
-                  className={`bg-gradient-to-br ${statusInfo.gradient} backdrop-blur border rounded-2xl p-5 transition-all hover:scale-[1.01]`}
+                  href={`/passenger/orders/${order.order_number}`}
+                  className={`block bg-gradient-to-br ${statusInfo.gradient} backdrop-blur border rounded-2xl p-5 transition-all hover:scale-[1.01] hover:border-cyan-500/50 cursor-pointer`}
                 >
                   {/* 订单头部 */}
                   <div className="flex items-start justify-between mb-4 pb-4 border-b border-slate-700/30">
@@ -377,7 +395,7 @@ function PassengerOrdersContent() {
                         </h3>
                       </div>
                       <p className="text-xs text-slate-500">
-                        提交：{new Date(order.created_at).toLocaleString('zh-HK', { 
+                        提交：{new Date(order.created_at).toLocaleString('zh-HK', {
                           month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
                         })}
                       </p>
@@ -399,9 +417,9 @@ function PassengerOrdersContent() {
                         <p className="text-slate-100 font-medium truncate">{pickupText}</p>
                       </div>
                     </div>
-                    
+
                     <div className="ml-4 border-l-2 border-dashed border-slate-700 h-3" />
-                    
+
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                         <MapPin className="w-4 h-4 text-orange-400" />
@@ -439,8 +457,47 @@ function PassengerOrdersContent() {
                     </span>
                   </div>
 
-                  {/* 司机信息（已接单时显示） */}
-                  {order.status === 'grabbed' && order.driver_name && (
+                  {/* 🔔 司機報價（醒目金黃色橫幅） */}
+                  {order.confirmed_price != null && (
+                    <div className="bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-orange-500/20 border border-yellow-500/50 rounded-xl p-4 mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-lg">
+                            💰
+                          </div>
+                          <div>
+                            <p className="text-xs text-yellow-300 font-medium">司機已報價</p>
+                            <p className="text-[10px] text-yellow-400/70">
+                              {order.price_confirmed_at
+                                ? new Date(order.price_confirmed_at).toLocaleString('zh-HK', {
+                                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+                                  })
+                                : '剛剛'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-300">
+                            {order.price_currency === 'CNY' ? '¥' : 'HK$'} {order.confirmed_price}
+                          </div>
+                          {order.estimated_fare != null && order.confirmed_price !== order.estimated_fare && (
+                            <p className="text-[10px] text-slate-400">
+                              預估 {order.price_currency === 'CNY' ? '¥' : 'HK$'} {order.estimated_fare}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 border border-yellow-500/40 rounded-lg text-sm font-medium transition"
+                      >
+                        查看詳情並確認 →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 司機信息（已接单时显示） */}
+                  {(order.status === 'grabbed' || order.status === 'price_confirmed') && order.driver_name && (
                     <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 mb-4">
                       <p className="text-xs text-emerald-400 mb-2 font-medium flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
@@ -453,13 +510,20 @@ function PassengerOrdersContent() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-slate-400">聯絡電話</span>
-                          <a 
+                          <a
                             href={`tel:${order.driver_phone}`}
+                            onClick={e => e.stopPropagation()}
                             className="text-sm text-cyan-400 hover:text-cyan-300 font-mono font-medium"
                           >
                             {order.driver_phone}
                           </a>
                         </div>
+                        {order.driver_plate && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-400">車牌</span>
+                            <span className="text-sm text-slate-100 font-mono">{order.driver_plate}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -467,7 +531,12 @@ function PassengerOrdersContent() {
                   {/* 操作按钮 */}
                   {order.status === 'pending' && (
                     <button
-                      onClick={() => handleCancelOrder(order.id, order.order_number)}
+                      type="button"
+                      onClick={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleCancelOrder(order.id, order.order_number)
+                      }}
                       disabled={cancellingId === order.id}
                       className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium"
                     >
@@ -484,7 +553,14 @@ function PassengerOrdersContent() {
                       )}
                     </button>
                   )}
-                </div>
+
+                  {/* 查看詳情鏈接（pending 以外的訂單） */}
+                  {order.status !== 'pending' && (
+                    <div className="text-center text-xs text-cyan-400 mt-2">
+                      點擊卡片查看完整詳情 →
+                    </div>
+                  )}
+                </Link>
               )
             })}
           </div>
