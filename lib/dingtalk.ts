@@ -119,21 +119,17 @@ export async function pushOrderText(opts: {
   remark?: string
   direction?: 'hk_to_mainland' | 'mainland_to_hk' | string
 }) {
-  const baseUrl = process.env.NEXT_PUBLIC_DRIVER_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  // 站點 URL 解析順序：
+  // 1. DRIVER_SITE_URL — server-side env var (推薦，可隨時改)
+  // 2. NEXT_PUBLIC_DRIVER_SITE_URL / NEXT_PUBLIC_SITE_URL — fallback (build-time inline)
+  // 3. http://localhost:3000 — 開發環境 fallback
+  const baseUrl =
+    process.env.DRIVER_SITE_URL ||
+    process.env.NEXT_PUBLIC_DRIVER_SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'http://localhost:3000'
   const token = opts.grabToken || opts.orderNumber
   const link = opts.driverLink || `${baseUrl}/driver/grab/${token}`
-
-  const carTypeZh =
-    {
-      sedan_5: '5座豐田',
-      alphard_7: '7座埃爾法',
-      business_9: '9座商務',
-      '5_seat': '5座豐田',
-      '7_seat': '7座埃爾法',
-      '9_seat': '9座商務',
-      '4_seat': '4座車',
-      '8_seat': '8座車',
-    }[opts.carType] || opts.carType
 
   const directionText =
     opts.direction === 'mainland_to_hk'
@@ -157,7 +153,6 @@ export async function pushOrderText(opts: {
     `👤 乘客：${opts.passengerName}`,
     `📞 電話：${opts.passengerPhone}`,
     `💰 預估車資：HK$ ${opts.estimatedFare ? opts.estimatedFare.toLocaleString() : '待確認'}`,
-    `🚙 車型：${carTypeZh}`,
     `👥 乘客人數：${opts.passengers}人`,
     `💼 行李數量：${opts.luggage}件`,
     opts.remark ? `📝 備註：${opts.remark}` : '',
@@ -199,7 +194,11 @@ export interface OrderActionCardInput {
  * 推播 ActionCard：標題 + 行程摘要 + 單個按鈕（🚗 立即搶單）
  */
 export async function pushOrderActionCard(input: OrderActionCardInput) {
-  const baseUrl = process.env.NEXT_PUBLIC_DRIVER_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const baseUrl =
+    process.env.DRIVER_SITE_URL ||
+    process.env.NEXT_PUBLIC_DRIVER_SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'http://localhost:3000'
   const grabUrl = input.grabUrl ?? `${baseUrl}/driver/grab/${input.grabToken}`
 
   const vehicleMap: Record<string, string> = {
