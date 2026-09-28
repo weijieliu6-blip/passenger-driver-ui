@@ -99,9 +99,56 @@ export default function DriverGrabPage() {
 
   useEffect(() => {
     const url = new URL(window.location.href)
-    const sid = url.searchParams.get('staff_id') ?? ''
-    setStaffId(sid)
-    setStaffIdInput(sid)
+    const querySid = url.searchParams.get('staff_id') ?? ''
+    setStaffIdInput(querySid)
+
+    // 嘗試從釘釘 JS SDK 自動拿到 userId
+    // 僅在釘釘 H5 內開啟時才會成功（window.dd 是釘釘注入的全局變數）
+    let cancelled = false
+    const tryDingTalkSdk = () => {
+      const dd = (window as unknown as { dd?: any }).dd
+      if (!dd || !dd.runtime) return false
+      try {
+        dd.runtime.ready({
+          onSuccess: () => {
+            if (cancelled) return
+            dd.runtime.permission.requestUserInfo({
+              onSuccess: (info: { userid: string; nickName?: string }) => {
+                if (cancelled) return
+                if (info?.userid) {
+                  setStaffId(info.userid)
+                }
+              },
+              onFail: (err: unknown) => {
+                console.warn('[dingtalk] requestUserInfo failed:', err)
+              },
+            })
+          },
+          onFail: (err: unknown) => {
+            console.warn('[dingtalk] dd.runtime.ready failed:', err)
+          },
+        })
+        return true
+      } catch (e) {
+        console.warn('[dingtalk] SDK init error:', e)
+        return false
+      }
+    }
+
+    // 釘釘 SDK 可能比 React 載入慢，做幾次 retry
+    let attempts = 0
+    const maxAttempts = 20
+    const tick = () => {
+      if (cancelled) return
+      if (tryDingTalkSdk()) return
+      attempts++
+      if (attempts < maxAttempts) setTimeout(tick, 250)
+    }
+    tick()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const fetchState = useCallback(async (sid: string) => {
