@@ -457,17 +457,17 @@ function PassengerOrdersContent() {
                     </span>
                   </div>
 
-                  {/* 🔔 司機報價（醒目金黃色橫幅） */}
+                  {/* 🔔 司機報價（深藍紫 + 銀色字，專業不刺眼） */}
                   {order.confirmed_price != null && (
-                    <div className="bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-orange-500/20 border border-yellow-500/50 rounded-xl p-4 mb-3">
+                    <div className="bg-gradient-to-r from-slate-800 via-slate-800/95 to-slate-800 border border-slate-600 rounded-xl p-4 mb-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-lg">
-                            💰
+                          <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-base shadow-md shadow-cyan-500/20">
+                            💬
                           </div>
                           <div>
-                            <p className="text-xs text-yellow-300 font-medium">司機已報價</p>
-                            <p className="text-[10px] text-yellow-400/70">
+                            <p className="text-xs text-slate-300 font-medium">司機已報價</p>
+                            <p className="text-[10px] text-slate-500">
                               {order.price_confirmed_at
                                 ? new Date(order.price_confirmed_at).toLocaleString('zh-HK', {
                                     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
@@ -477,11 +477,11 @@ function PassengerOrdersContent() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-300">
+                          <div className="text-2xl font-bold text-slate-50">
                             {order.price_currency === 'CNY' ? '¥' : 'HK$'} {order.confirmed_price}
                           </div>
                           {order.estimated_fare != null && order.confirmed_price !== order.estimated_fare && (
-                            <p className="text-[10px] text-slate-400">
+                            <p className="text-[10px] text-slate-500">
                               預估 {order.price_currency === 'CNY' ? '¥' : 'HK$'} {order.estimated_fare}
                             </p>
                           )}
@@ -489,7 +489,7 @@ function PassengerOrdersContent() {
                       </div>
                       <button
                         type="button"
-                        className="w-full py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 border border-yellow-500/40 rounded-lg text-sm font-medium transition"
+                        className="w-full py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-sm font-medium transition"
                       >
                         查看詳情並確認 →
                       </button>

@@ -230,7 +230,7 @@ export default function PassengerProfilePage() {
     const map: Record<string, { label: string, color: string }> = {
       'pending': { label: '待接單', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
       'grabbed': { label: '已接單', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
-      'price_confirmed': { label: '已報價', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
+      'price_confirmed': { label: '已報價', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
       'completed': { label: '已完成', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
       'cancelled': { label: '已取消', color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
     }
@@ -453,8 +453,8 @@ export default function PassengerProfilePage() {
                         </button>
                       )}
                       {(order.status === 'grabbed' || order.status === 'price_confirmed') && order.confirmed_price && (
-                        <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded">
-                          💰 {order.price_currency === 'CNY' ? '¥' : 'HK$'}{order.confirmed_price}
+                        <span className="px-2 py-1 bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs rounded">
+                          💬 {order.price_currency === 'CNY' ? '¥' : 'HK$'}{order.confirmed_price}
                         </span>
                       )}
                     </div>

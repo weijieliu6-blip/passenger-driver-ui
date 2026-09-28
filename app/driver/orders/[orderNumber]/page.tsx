@@ -251,7 +251,7 @@ export default function DriverOrderDetailPage() {
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50">
               <div>
                 <p className="text-sm text-slate-400 mb-1">出發時間</p>
-                <p className="text-slate-100">{new Date(order.departure_time).toLocaleString('zh-CN')}</p>
+                <p className="text-slate-100">{formatDepartureTime(order.departure_time)}</p>
               </div>
               <div>
                 <p className="text-sm text-slate-400 mb-1">行程方向</p>
@@ -488,7 +488,7 @@ export default function DriverOrderDetailPage() {
             </div>
             {order.price_confirmed_at && (
               <p className="text-xs text-slate-400 mt-2">
-                確認時間：{new Date(order.price_confirmed_at).toLocaleString('zh-CN')}
+                確認時間：{formatDepartureTime(order.price_confirmed_at)}
               </p>
             )}
             <p className="text-sm text-slate-300 mt-3">
@@ -499,4 +499,20 @@ export default function DriverOrderDetailPage() {
       </main>
     </div>
   )
+}
+
+/**
+ * 格式化 ISO 時間字串 → 友好顯示
+ * @example 2026-10-08T10:00:00+08:00 → "2026/10/08 10:00"
+ */
+function formatDepartureTime(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}/${mm}/${dd} ${hh}:${mi}`
 }

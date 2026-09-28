@@ -313,17 +313,17 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* 🔔 司機報價（醒目區塊） */}
+        {/* 🔔 司機報價（深色專業配色） */}
         {order.confirmed_price != null && (
-          <div className="bg-gradient-to-br from-yellow-500/20 via-amber-500/15 to-orange-500/20 border border-yellow-500/50 rounded-2xl p-5">
+          <div className="bg-gradient-to-br from-slate-800 via-slate-800/95 to-slate-900 border border-slate-600 rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center text-xl shadow-lg shadow-yellow-500/30">
-                  💰
+                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
+                  💬
                 </div>
                 <div>
-                  <p className="text-base font-bold text-yellow-300">司機已報價</p>
-                  <p className="text-xs text-yellow-400/70">
+                  <p className="text-base font-bold text-slate-100">司機已報價</p>
+                  <p className="text-xs text-slate-400">
                     {order.price_confirmed_at
                       ? new Date(order.price_confirmed_at).toLocaleString('zh-HK')
                       : '剛剛'}
@@ -331,11 +331,11 @@ export default function OrderDetailPage() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-amber-300">
+                <p className="text-3xl font-bold text-slate-50">
                   {cur} {order.confirmed_price}
                 </p>
                 {order.estimated_fare != null && order.confirmed_price !== order.estimated_fare && (
-                  <p className="text-xs text-slate-400 line-through">
+                  <p className="text-xs text-slate-500 line-through">
                     原預估 {cur} {order.estimated_fare}
                   </p>
                 )}
@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
                   type="button"
                   onClick={handleAcceptQuote}
                   disabled={accepting}
-                  className="flex-1 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20"
                 >
                   {accepting ? <><Loader2 className="w-4 h-4 animate-spin" /> 確認中...</> : <><CheckCircle2 className="w-4 h-4" /> 確認接單</>}
                 </button>
@@ -357,7 +357,7 @@ export default function OrderDetailPage() {
                   type="button"
                   onClick={handleCancel}
                   disabled={cancelling}
-                  className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl transition disabled:opacity-50"
+                  className="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600 rounded-xl transition disabled:opacity-50"
                 >
                   婉拒
                 </button>
