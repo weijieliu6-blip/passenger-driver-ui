@@ -1,10 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone, ClipboardList } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { useT } from '@/components/i18n-provider'
+import { getLocationsByArea } from '@/lib/location-coords'
+
+// Leaflet 必須動態加載（瀏覽器 API only, 不能 SSR）
+const PickupMap = dynamic(() => import('@/components/pickup-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-lg border border-slate-700/50 bg-slate-900/30 flex items-center justify-center text-slate-500 text-sm" style={{ height: '280px' }}>
+      載入地圖中...
+    </div>
+  ),
+})
 
 export default function HomePage() {
   const router = useRouter()
@@ -845,6 +857,29 @@ export default function HomePage() {
                   </select>
                 </div>
               )}
+
+              {/* 🗺️ 地圖：當用戶選擇了具體地點，顯示地圖輔助確認位置 */}
+              {formData.pickupArea && (() => {
+                const mapLocations = getLocationsByArea(formData.pickupLocation)
+                return (
+                  <div className="mt-3 animate-fadeIn">
+                    <label className="block text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      地圖位置（點擊標記可切換上車點）
+                    </label>
+                    <PickupMap
+                      locations={mapLocations}
+                      selectedName={formData.pickupArea}
+                      onSelect={(loc) => setFormData({ ...formData, pickupArea: loc.name })}
+                    />
+                    {formData.pickupArea && (
+                      <p className="mt-1.5 text-xs text-slate-500">
+                        📍 已選擇：<span className="text-cyan-400 font-medium">{formData.pickupArea}</span>
+                      </p>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* 目的地 */}
