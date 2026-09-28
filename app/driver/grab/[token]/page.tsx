@@ -85,6 +85,8 @@ export default function DriverGrabPage() {
 
   // 從 query 拿 staff_id（釘釘 H5 入口會帶 ?staff_id=xxx）
   const [staffId, setStaffId] = useState('')
+  // 簡易搶單身份輸入：當 URL 沒帶 staff_id 時，用戶手動輸入（手機號/工號/姓名）
+  const [manualStaffId, setManualStaffId] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [order, setOrder] = useState<OrderInfo | null>(null)
@@ -590,6 +592,44 @@ export default function DriverGrabPage() {
             ) : null}
           </div>
         </div>
+
+        {/* 搶單身份輸入（沒帶 staff_id 時顯示） */}
+        {!staffId && (
+          <div className="bg-gradient-to-br from-amber-500/15 to-orange-500/10 border border-amber-500/40 rounded-2xl p-5 mb-4">
+            <h3 className="text-base font-semibold text-amber-300 mb-1">🪪 司機身份確認</h3>
+            <p className="text-xs text-slate-400 mb-3">
+              請輸入您的<strong className="text-amber-300">手機號碼</strong>或<strong className="text-amber-300">釘釘工號</strong>：
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="tel"
+                value={manualStaffId}
+                onChange={e => setManualStaffId(e.target.value)}
+                placeholder="例如：91234567 或 staff_xxx"
+                className="flex-1 px-3 py-2.5 bg-slate-900 border border-amber-500/40 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const v = manualStaffId.trim()
+                  if (v) {
+                    setStaffId(v)
+                    setManualStaffId('')
+                  }
+                }}
+                disabled={!manualStaffId.trim()}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 disabled:from-slate-600 disabled:to-slate-600 text-slate-900 font-bold rounded-lg text-sm"
+              >
+                確認身份
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              📌 已註冊司機：輸入已註冊手機號即可搶單<br />
+              📌 首次接單：輸入任意識別碼，填寫下方資料後即註冊並搶單
+            </p>
+          </div>
+        )}
 
         {/* 註冊表單（首次訪問） */}
         {needsRegistration && staffId ? (
