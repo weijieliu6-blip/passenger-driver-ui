@@ -74,16 +74,30 @@ export default function DriverRecruitPage() {
 
     setSubmitting(true)
     try {
-      // v1: 直接寫入 drivers 表（後台人工審核 active 欄位）
-      // 注意：drivers 表當前用於搶單註冊 (dingtalk_staff_id)；這裡我們先記錄到 console，
-      //      留作後續 recruiter flow 串接 (TODO)
-      console.log('[recruit] 司機申請：', form)
-      // 模擬審核流程
-      await new Promise(r => setTimeout(r, 1200))
+      const res = await fetch('/api/driver-recruit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim() || undefined,
+          plate: form.plate.trim(),
+          carType: form.carType,
+          drivingYears: Number(form.drivingYears),
+          city: form.city.trim() || undefined,
+          hasCrossBorderPermit: form.hasCrossBorderPermit,
+          message: form.message.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setError(data.error || '提交失敗，請稍後重試')
+        return
+      }
       setSuccess(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '提交失敗，請稍後重試')
+      setError(err instanceof Error ? err.message : '網絡錯誤，請稍後重試')
     } finally {
       setSubmitting(false)
     }
