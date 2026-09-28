@@ -594,23 +594,23 @@ export default function HomePage() {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-slate-50">{t('home.page_subtitle')}</h3>
-              <p className="text-xs text-cyan-300">安全 · 舒適 · 便捷</p>
+              <p className="text-xs text-cyan-300">{t('home.tagline')}</p>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center p-2 bg-slate-900/30 rounded-lg">
               <div className="flex items-center justify-center gap-1 mb-0.5">
                 <CheckCircle className="w-3 h-3 text-green-400" />
-                <span className="text-xs font-medium text-slate-300">在線司機</span>
+                <span className="text-xs font-medium text-slate-300">{t('home.online_drivers')}</span>
               </div>
               <div className="text-xl font-bold text-cyan-400">127</div>
             </div>
             <div className="text-center p-2 bg-slate-900/30 rounded-lg">
               <div className="flex items-center justify-center gap-1 mb-0.5">
                 <Clock className="w-3 h-3 text-yellow-400" />
-                <span className="text-xs font-medium text-slate-300">平均響應</span>
+                <span className="text-xs font-medium text-slate-300">{t('home.avg_response')}</span>
               </div>
-              <div className="text-xl font-bold text-cyan-400">3分鐘</div>
+              <div className="text-xl font-bold text-cyan-400">{t('home.avg_response_val')}</div>
             </div>
             <div className="text-center p-2 bg-slate-900/30 rounded-lg">
               <div className="flex items-center justify-center gap-1 mb-0.5">
@@ -723,7 +723,7 @@ export default function HomePage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 <MapPin className="inline w-4 h-4 mr-1" />
-                行程方向
+                {t('form.direction')}
               </label>
               {formData.serviceType === 'cross_border' ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -736,7 +736,7 @@ export default function HomePage() {
                         : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                     }`}
                   >
-                    香港 → 內地
+                    {t('form.dir.hk_to_mainland')}
                   </button>
                   <button
                     type="button"
@@ -747,7 +747,7 @@ export default function HomePage() {
                         : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                     }`}
                   >
-                    內地 → 香港
+                    {t('form.dir.mainland_to_hk')}
                   </button>
                 </div>
               ) : (
@@ -761,7 +761,7 @@ export default function HomePage() {
                         : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                     }`}
                   >
-                    深圳 → 汕尾
+                    {t('form.dir.sz_to_sw')}
                   </button>
                   <button
                     type="button"
@@ -772,7 +772,7 @@ export default function HomePage() {
                         : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                     }`}
                   >
-                    汕尾 → 深圳
+                    {t('form.dir.sw_to_sz')}
                   </button>
                 </div>
               )}
@@ -782,7 +782,7 @@ export default function HomePage() {
             <div>
               <label htmlFor="pickupLocation" className="block text-sm font-medium text-slate-300 mb-2">
                 <MapPin className="inline w-4 h-4 mr-1" />
-                出發地
+                {t('form.pickup')}
               </label>
               <select
                 id="pickupLocation"
@@ -847,7 +847,7 @@ export default function HomePage() {
             <div>
               <label htmlFor="dropoffLocation" className="block text-sm font-medium text-slate-300 mb-2">
                 <MapPin className="inline w-4 h-4 mr-1" />
-                目的地
+                {t('form.dropoff')}
               </label>
               <select
                 id="dropoffLocation"
@@ -912,7 +912,7 @@ export default function HomePage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 <Car className="inline w-4 h-4 mr-1" />
-                車輛類型
+                {t('form.vehicle')}
               </label>
               <div className="grid grid-cols-3 gap-3">
                 {getVehicleOptions().map((vehicle) => (
@@ -940,14 +940,14 @@ export default function HomePage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">
                 <Calendar className="inline w-4 h-4 mr-1" />
-                出發日期與時間
+                {t('form.date')}
               </label>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 {/* 日期選擇 */}
                 <div>
                   <label htmlFor="departureDate" className="block text-xs font-medium text-slate-400 mb-2">
-                    選擇日期
+                    {t('form.date_pick')}
                   </label>
                   <select
                     id="departureDate"
@@ -957,7 +957,7 @@ export default function HomePage() {
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                     suppressHydrationWarning
                   >
-                    <option value="">請選擇日期</option>
+                    <option value="">{t('form.date_placeholder')}</option>
                     {getDateOptions().map((date) => (
                       <option key={date.value} value={date.value}>
                         {date.label}
@@ -969,7 +969,7 @@ export default function HomePage() {
                 {/* 時間選擇 */}
                 <div>
                   <label htmlFor="departureTime" className="block text-xs font-medium text-slate-400 mb-2">
-                    選擇時間
+                    {t('form.time_pick')}
                   </label>
                   <select
                     id="departureTime"
@@ -979,7 +979,7 @@ export default function HomePage() {
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                     suppressHydrationWarning
                   >
-                    <option value="">請選擇時間</option>
+                    <option value="">{t('form.time_placeholder')}</option>
                     {getTimeOptions().map((time) => (
                       <option key={time.value} value={time.value}>
                         {time.label}
@@ -995,9 +995,9 @@ export default function HomePage() {
               <div>
                 <label htmlFor="passengers" className="block text-sm font-medium text-slate-300 mb-2">
                   <Users className="inline w-4 h-4 mr-1" />
-                  乘車人數
+                  {t('form.passengers')}
                 </label>
-                
+
                 {/* 包車和孩童選項 */}
                 <div className="mb-3 space-y-2">
                   <label className="flex items-center gap-2 p-2 bg-slate-900/50 border border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition text-sm">
@@ -1007,9 +1007,9 @@ export default function HomePage() {
                       onChange={(e) => handleCharterChange(e.target.checked)}
                       className="w-4 h-4 text-cyan-500 bg-slate-800 border-slate-500 rounded focus:ring-cyan-500 focus:ring-2"
                     />
-                    <span className="text-slate-300">包車</span>
+                    <span className="text-slate-300">{t('form.charter')}</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-2 p-2 bg-slate-900/50 border border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition text-sm">
                     <input
                       type="checkbox"
@@ -1018,7 +1018,7 @@ export default function HomePage() {
                       className="w-4 h-4 text-cyan-500 bg-slate-800 border-slate-500 rounded focus:ring-cyan-500 focus:ring-2"
                     />
                     <Baby className="inline w-4 h-4 text-slate-400" />
-                    <span className="text-slate-300">孩童</span>
+                    <span className="text-slate-300">{t('form.child')}</span>
                   </label>
                 </div>
 
@@ -1032,15 +1032,15 @@ export default function HomePage() {
                       onChange={(e) => handleChildTypeChange(e.target.value)}
                       className="w-full px-3 py-2 text-sm bg-slate-800/50 border border-slate-500 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                     >
-                      <option value="">請選擇孩童年齡</option>
-                      <option value="infant">嬰兒（0-3歲以下）</option>
-                      <option value="over_3">3歲以上</option>
+                      <option value="">{t('form.child_age_ph')}</option>
+                      <option value="infant">{t('form.child_infant')}</option>
+                      <option value="over_3">{t('form.child_over_3')}</option>
                     </select>
-                    
+
                     {formData.childType === 'over_3' && (
                       <div className="mt-2 text-xs text-orange-400 bg-orange-500/10 px-2 py-1.5 rounded border border-orange-500/30 flex items-start gap-1">
                         <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                        <span>3歲以上孩童將會計算一個座位</span>
+                        <span>{t('form.child_seat_note')}</span>
                       </div>
                     )}
                   </div>
@@ -1064,7 +1064,7 @@ export default function HomePage() {
               <div>
                 <label htmlFor="luggage" className="block text-sm font-medium text-slate-300 mb-2">
                   <Luggage className="inline w-4 h-4 mr-1" />
-                  行李數量
+                  {t('form.luggage')}
                 </label>
                 <select
                   id="luggage"
@@ -1093,13 +1093,13 @@ export default function HomePage() {
               return fare ? (
                 <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-lg p-4 animate-fadeIn">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-slate-400">💰 預估車資</div>
+                    <div className="text-sm text-slate-400">💰 {t('form.estimate')}</div>
                     <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">
                       HK$ {fare.minFare} - {fare.maxFare}
                     </div>
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
-                    * 實際價格由司機報價，以上僅供參考
+                    * {t('form.fare_note')}
                   </div>
                 </div>
               ) : null
@@ -1109,8 +1109,8 @@ export default function HomePage() {
           {/* 提示信息 */}
           <div className="mt-4 p-3 bg-slate-900/50 border border-slate-700/50 rounded-lg">
             <p className="text-xs text-slate-400 leading-relaxed">
-              💡 <span className="font-medium text-slate-300">溫馨提示：</span>
-              提交訂單後，平台將為您匹配合適的司機。費用請直接與司機線下結算，平台不抽成。
+              💡 <span className="font-medium text-slate-300">{t('form.tip.label')}</span>
+              {t('form.tip.body')}
             </p>
           </div>
         </div>
