@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import type { LocationCoord } from '@/lib/location-coords'
 import { getCenterOfLocations } from '@/lib/location-coords'
 
-// Leaflet 默認 marker 圖標（用 CDN 避免打包問題）
+// 默認藍色 marker（用 CDN 避免打包問題）
 const defaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -18,71 +18,107 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41],
 })
 
-// 選中時的藍色 marker
+// 選中時的彩色水滴 marker（自定義 SVG）
 const selectedIcon = L.divIcon({
   html: `<div style="
-    background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
     width: 32px;
     height: 32px;
     border-radius: 50% 50% 50% 0;
     transform: rotate(-45deg);
     border: 3px solid #fff;
-    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    animation: bounce 0.4s ease-out;
   ">
     <div style="
       transform: rotate(45deg);
       color: white;
-      font-weight: bold;
+      font-weight: 700;
       font-size: 16px;
+      line-height: 1;
     >✓</div>
-  </div>`,
+  </div>
+  <style>
+    @keyframes bounce {
+      0% { transform: rotate(-45deg) scale(0.5); }
+      60% { transform: rotate(-45deg) scale(1.15); }
+      100% { transform: rotate(-45deg) scale(1); }
+    }
+  </style>`,
   iconSize: [32, 32],
   iconAnchor: [16, 32],
   popupAnchor: [0, -32],
-  className: 'custom-marker',
+  className: 'custom-selected-marker',
 })
 
 // 修復 Leaflet 默認 icon 路徑問題
 L.Marker.prototype.options.icon = defaultIcon
 
 interface PickupMapProps {
-  /** 該地區的所有可選坐標 */
   locations: LocationCoord[]
-  /** 已選中的坐標名稱 */
   selectedName?: string | null
-  /** 點擊地圖標記時的回調 */
   onSelect?: (location: LocationCoord) => void
-  /** 自定義高度 */
   height?: string
 }
 
 /**
- * 瓦片源配置（按優先級排序）
- * 1. CartoDB Voyager - 全球 CDN，無需 key，深色風格（與平台設計匹配）
- * 2. OpenStreetMap - 兜底源
+ * 瓦片源列表（按優先級）
+ * - 全部已手動驗證 200 OK
+ * - 優先用 ArcGIS World Street Map（高清街道圖，無需 key）
+ * - 失敗自動切到 OpenStreetMap 兜底
  */
 const TILE_LAYERS = [
   {
-    name: 'CartoDB Voyager',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    name: 'ArcGIS World Street Map',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
     attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
-  {
-    name: 'CartoDB Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), MapmyIndia, NGCC, OpenStreetMap contributors, the GIS User Community',
   },
   {
     name: 'OpenStreetMap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
-]
+] as const
+
+/**
+ * 帶瓦片降級的 TileLayer
+ * 自動切換：主源失敗 → 備用源
+ */
+function RobustTileLayer({ onAllFailed }: { onAllFailed: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const layer = TILE_LAYERS[currentIndex]
+
+  if (!layer) {
+    onAllFailed()
+    return null
+  }
+
+  return (
+    <TileLayer
+      key={currentIndex}
+      attribution={layer.attribution}
+      url={layer.url}
+      maxZoom={19}
+      eventHandlers={{
+        tileerror: () => {
+          if (currentIndex < TILE_LAYERS.length - 1) {
+            console.warn(
+              `[PickupMap] 瓦片源 ${layer.name} 載入失敗，切換到下一個`
+            )
+            setCurrentIndex((i) => i + 1)
+          } else {
+            console.error('[PickupMap] 所有瓦片源均載入失敗')
+            onAllFailed()
+          }
+        },
+      }}
+    />
+  )
+}
 
 /**
  * 當 locations 變化時自動重新計算中心
@@ -98,7 +134,7 @@ function MapAutoCenter({ locations }: { locations: LocationCoord[] }) {
 }
 
 /**
- * 當選定位置變化時自動定位到該標記
+ * 當選定位置變化時自動定位
  */
 function FlyToSelected({
   locations,
@@ -116,46 +152,6 @@ function FlyToSelected({
     }
   }, [selectedName, locations, map])
   return null
-}
-
-/**
- * 帶瓦片降級的 TileLayer
- *
- * 自動嘗試多個瓦片源，主源失敗時切到備用源
- */
-function RobustTileLayer({ onError }: { onError: () => void }) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [hasErrored, setHasErrored] = useState(false)
-  const layer = TILE_LAYERS[currentIndex]
-
-  if (!layer) return null
-
-  return (
-    <TileLayer
-      key={currentIndex}
-      attribution={layer.attribution}
-      url={layer.url}
-      maxZoom={19}
-      eventHandlers={{
-        tileerror: () => {
-          if (!hasErrored) {
-            setHasErrored(true)
-            // 嘗試下一個瓦片源
-            if (currentIndex < TILE_LAYERS.length - 1) {
-              console.warn(
-                `[PickupMap] 瓦片源 ${layer.name} 載入失敗，切換到下一個`
-              )
-              setCurrentIndex((i) => i + 1)
-              setHasErrored(false)
-            } else {
-              console.error('[PickupMap] 所有瓦片源均載入失敗')
-              onError()
-            }
-          }
-        },
-      }}
-    />
-  )
 }
 
 export default function PickupMap({
@@ -179,10 +175,7 @@ export default function PickupMap({
 
   if (allTilesFailed) {
     return (
-      <div
-        className="rounded-lg border border-amber-700/50 bg-amber-900/10 p-4 text-center"
-        style={{ height: 'auto' }}
-      >
+      <div className="rounded-lg border border-amber-700/50 bg-amber-900/10 p-4">
         <p className="text-amber-300 text-sm font-medium mb-2">
           ⚠️ 地圖瓦片載入失敗
         </p>
@@ -208,7 +201,7 @@ export default function PickupMap({
         scrollWheelZoom={false}
         style={{ height: '100%', width: '100%' }}
       >
-        <RobustTileLayer onError={() => setAllTilesFailed(true)} />
+        <RobustTileLayer onAllFailed={() => setAllTilesFailed(true)} />
         <MapAutoCenter locations={locations} />
         <FlyToSelected locations={locations} selectedName={selectedName} />
         {locations.map((loc) => {
