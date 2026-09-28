@@ -18,6 +18,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link href="/admin/drivers" className="text-slate-300 hover:text-cyan-400">
                 司機列表
               </Link>
+              <Link href="/admin/applications" className="text-slate-300 hover:text-cyan-400">
+                招募申請
+              </Link>
             </nav>
           </div>
           <Link href="/" className="text-xs text-slate-400 hover:text-slate-200">
