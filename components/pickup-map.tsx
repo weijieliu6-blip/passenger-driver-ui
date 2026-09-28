@@ -3,11 +3,11 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { LocationCoord } from '@/lib/location-coords'
 import { getCenterOfLocations } from '@/lib/location-coords'
 
-// Leaflet 默認 marker 圖標問題修復（Next.js 環境下）
+// Leaflet 默認 marker 圖標（用 CDN 避免打包問題）
 const defaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -18,14 +18,31 @@ const defaultIcon = L.icon({
   shadowSize: [41, 41],
 })
 
-const selectedIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [35, 57],
-  iconAnchor: [17, 57],
-  popupAnchor: [1, -48],
-  shadowSize: [57, 57],
+// 選中時的藍色 marker
+const selectedIcon = L.divIcon({
+  html: `<div style="
+    background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 3px solid #fff;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  ">
+    <div style="
+      transform: rotate(45deg);
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+    >✓</div>
+  </div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+  className: 'custom-marker',
 })
 
 // 修復 Leaflet 默認 icon 路徑問題
@@ -43,6 +60,31 @@ interface PickupMapProps {
 }
 
 /**
+ * 瓦片源配置（按優先級排序）
+ * 1. CartoDB Voyager - 全球 CDN，無需 key，深色風格（與平台設計匹配）
+ * 2. OpenStreetMap - 兜底源
+ */
+const TILE_LAYERS = [
+  {
+    name: 'CartoDB Voyager',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  {
+    name: 'CartoDB Dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
+  {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  },
+]
+
+/**
  * 當 locations 變化時自動重新計算中心
  */
 function MapAutoCenter({ locations }: { locations: LocationCoord[] }) {
@@ -50,7 +92,7 @@ function MapAutoCenter({ locations }: { locations: LocationCoord[] }) {
   useEffect(() => {
     if (locations.length === 0) return
     const center = getCenterOfLocations(locations)
-    map.setView(center, 11, { animate: true })
+    map.setView(center, 12, { animate: true })
   }, [locations, map])
   return null
 }
@@ -70,25 +112,60 @@ function FlyToSelected({
     if (!selectedName) return
     const target = locations.find((l) => l.name === selectedName)
     if (target) {
-      map.setView([target.lat, target.lng], 13, { animate: true })
+      map.setView([target.lat, target.lng], 14, { animate: true })
     }
   }, [selectedName, locations, map])
   return null
 }
 
 /**
- * 上車地點選擇地圖組件
+ * 帶瓦片降級的 TileLayer
  *
- * - 顯示該地區所有可選地點的標記
- * - 點擊標記觸發 onSelect 回調
- * - 已選中的標記會放大高亮
+ * 自動嘗試多個瓦片源，主源失敗時切到備用源
  */
+function RobustTileLayer({ onError }: { onError: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [hasErrored, setHasErrored] = useState(false)
+  const layer = TILE_LAYERS[currentIndex]
+
+  if (!layer) return null
+
+  return (
+    <TileLayer
+      key={currentIndex}
+      attribution={layer.attribution}
+      url={layer.url}
+      maxZoom={19}
+      eventHandlers={{
+        tileerror: () => {
+          if (!hasErrored) {
+            setHasErrored(true)
+            // 嘗試下一個瓦片源
+            if (currentIndex < TILE_LAYERS.length - 1) {
+              console.warn(
+                `[PickupMap] 瓦片源 ${layer.name} 載入失敗，切換到下一個`
+              )
+              setCurrentIndex((i) => i + 1)
+              setHasErrored(false)
+            } else {
+              console.error('[PickupMap] 所有瓦片源均載入失敗')
+              onError()
+            }
+          }
+        },
+      }}
+    />
+  )
+}
+
 export default function PickupMap({
   locations,
   selectedName,
   onSelect,
   height = '280px',
 }: PickupMapProps) {
+  const [allTilesFailed, setAllTilesFailed] = useState(false)
+
   if (locations.length === 0) {
     return (
       <div
@@ -100,23 +177,38 @@ export default function PickupMap({
     )
   }
 
+  if (allTilesFailed) {
+    return (
+      <div
+        className="rounded-lg border border-amber-700/50 bg-amber-900/10 p-4 text-center"
+        style={{ height: 'auto' }}
+      >
+        <p className="text-amber-300 text-sm font-medium mb-2">
+          ⚠️ 地圖瓦片載入失敗
+        </p>
+        <p className="text-amber-200/70 text-xs leading-relaxed">
+          網絡可能限制外部 CDN，請刷新頁面重試。
+          <br />
+          您仍可從上方下拉框選擇地點。
+        </p>
+      </div>
+    )
+  }
+
   const center = getCenterOfLocations(locations)
 
   return (
     <div
-      className="rounded-lg overflow-hidden border border-slate-700/50 shadow-lg"
+      className="rounded-lg overflow-hidden border border-slate-700/50 shadow-lg relative"
       style={{ height }}
     >
       <MapContainer
         center={center}
-        zoom={11}
+        zoom={12}
         scrollWheelZoom={false}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <RobustTileLayer onError={() => setAllTilesFailed(true)} />
         <MapAutoCenter locations={locations} />
         <FlyToSelected locations={locations} selectedName={selectedName} />
         {locations.map((loc) => {
