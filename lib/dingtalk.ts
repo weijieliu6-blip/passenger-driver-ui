@@ -293,3 +293,45 @@ export async function notifyOrderPriceConfirmed(
 請等待乘客最終確認，祝您旅途愉快！`
   return postToDingTalk({ msgtype: 'text', text: { content: text } })
 }
+
+/**
+ * 乘客確認接單通知（推送給司機 / 釘釘群）
+ *
+ * 觸發：乘客點擊「確認接單」接受報價後
+ * 內容：訂單編號 + 路線 + 出發時間 + 確認金額 + 乘客聯繫電話
+ */
+export async function notifyOrderAcceptedByPassenger(
+  orderNumber: string,
+  pickupLocation: string,
+  pickupArea: string | null,
+  dropoffLocation: string,
+  dropoffArea: string | null,
+  departureTime: string,
+  price: number,
+  currency: 'HKD' | 'CNY',
+  passengerName: string,
+  passengerPhone: string,
+  driverName?: string | null
+) {
+  const currencySymbol = currency === 'CNY' ? '¥' : 'HK$'
+  const dt = new Date(departureTime)
+  const dtLabel = isNaN(dt.getTime())
+    ? departureTime
+    : `${dt.getFullYear()}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
+
+  const pickupText = pickupArea ? `${pickupLocation} - ${pickupArea}` : pickupLocation
+  const dropoffText = dropoffArea ? `${dropoffLocation} - ${dropoffArea}` : dropoffLocation
+
+  const text = `✅ 乘客已確認 #${orderNumber}
+
+乘客已接受您的報價，行程確定！
+
+🚗 路線：${pickupText} → ${dropoffText}
+📅 出發：${dtLabel}
+💰 車資：${currencySymbol} ${price.toLocaleString()}
+👤 乘客：${passengerName}
+📞 聯繫：${passengerPhone}
+
+請準時於出發地點接送乘客，保持電話暢通。祝您旅途愉快！`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
