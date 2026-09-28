@@ -98,6 +98,16 @@ function PassengerLoginForm() {
       const response = await fetch('/api/auth/me')
       const data = await response.json()
       if (data.authenticated) {
+        // 如果有待恢復的訂單數據，先恢復再跳轉
+        if (typeof window !== 'undefined' && sessionStorage.getItem('pendingBooking')) {
+          const pending = sessionStorage.getItem('pendingBooking')
+          if (pending) {
+            localStorage.setItem('bookingData', pending)
+            sessionStorage.removeItem('pendingBooking')
+          }
+          router.push('/')
+          return
+        }
         router.push(redirectTo)
       }
     } catch (err) {
@@ -198,10 +208,21 @@ function PassengerLoginForm() {
       })
       
       const data = await response.json()
-      
+
       if (data.success) {
         setSuccess(data.message || (mode === 'login' ? '登入成功！' : '註冊成功！'))
         setTimeout(() => {
+          // 如果有未完成的訂單表單數據，從 sessionStorage 恢復到 localStorage 並跳回首頁
+          if (typeof window !== 'undefined' && sessionStorage.getItem('pendingBooking')) {
+            const pending = sessionStorage.getItem('pendingBooking')
+            if (pending) {
+              localStorage.setItem('bookingData', pending)
+              sessionStorage.removeItem('pendingBooking')
+            }
+            router.push('/')
+            router.refresh()
+            return
+          }
           router.push(redirectTo)
           router.refresh()
         }, 800)

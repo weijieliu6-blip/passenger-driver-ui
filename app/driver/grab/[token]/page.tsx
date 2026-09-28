@@ -85,7 +85,6 @@ export default function DriverGrabPage() {
 
   // 從 query 拿 staff_id（釘釘 H5 入口會帶 ?staff_id=xxx）
   const [staffId, setStaffId] = useState('')
-  const [staffIdInput, setStaffIdInput] = useState('') // 測試輸入框
 
   const [loading, setLoading] = useState(true)
   const [order, setOrder] = useState<OrderInfo | null>(null)
@@ -97,10 +96,17 @@ export default function DriverGrabPage() {
   const [grabOk, setGrabOk] = useState<GrabOkResponse | null>(null)
   const [grabErr, setGrabErr] = useState<{ message: string; status?: string } | null>(null)
 
+  // 報價狀態（搶單成功後顯示）
+  const [price, setPrice] = useState('')
+  const [currency, setCurrency] = useState<'HKD' | 'CNY'>('HKD')
+  const [vehicleModel, setVehicleModel] = useState('')
+  const [quoteSubmitting, setQuoteSubmitting] = useState(false)
+  const [quoteOk, setQuoteOk] = useState<{ confirmedPrice: number; priceCurrency: string } | null>(null)
+  const [quoteErr, setQuoteErr] = useState<string | null>(null)
+
   useEffect(() => {
     const url = new URL(window.location.href)
     const querySid = url.searchParams.get('staff_id') ?? ''
-    setStaffIdInput(querySid)
     // 如果 URL 已經帶 staff_id（從分享連結帶來），直接用
     if (querySid) setStaffId(querySid)
 
@@ -179,10 +185,6 @@ export default function DriverGrabPage() {
     if (token) fetchState(staffId)
   }, [token, staffId, fetchState])
 
-  const handleSetStaffId = () => {
-    if (staffIdInput.trim()) setStaffId(staffIdInput.trim())
-  }
-
   const handleRegisterSubmit = async (formData: FormData) => {
     setSubmitting(true)
     setGrabErr(null)
@@ -236,6 +238,42 @@ export default function DriverGrabPage() {
       setGrabErr({ message: e instanceof Error ? e.message : '網絡錯誤' })
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // 報價確認（搶單成功後）
+  const handleQuoteSubmit = async () => {
+    setQuoteErr(null)
+    const priceNum = Number(price)
+    if (!Number.isFinite(priceNum) || priceNum <= 0) {
+      setQuoteErr('請輸入有效的價格')
+      return
+    }
+    setQuoteSubmitting(true)
+    try {
+      const res = await fetch(`/api/driver/grab/${encodeURIComponent(token)}/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_id: staffId,
+          confirmed_price: priceNum,
+          price_currency: currency,
+          vehicle_model: vehicleModel || undefined,
+        }),
+      })
+      const data = (await res.json()) as any
+      if (res.ok && data.success) {
+        setQuoteOk({
+          confirmedPrice: data.order.confirmedPrice,
+          priceCurrency: data.order.priceCurrency,
+        })
+      } else {
+        setQuoteErr(data.error ?? data.message ?? '報價失敗')
+      }
+    } catch (e) {
+      setQuoteErr(e instanceof Error ? e.message : '網絡錯誤')
+    } finally {
+      setQuoteSubmitting(false)
     }
   }
 
@@ -306,16 +344,24 @@ export default function DriverGrabPage() {
     )
   }
 
-  // 搶單成功
-  if (grabOk) {
+  // 搶單成功 + 報價已完成 → 顯示完整結果
+  if (grabOk && quoteOk) {
     return (
       <CenterShell>
         <div className="max-w-md w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+          <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-emerald-400" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">搶單成功！</h1>
+          <h1 className="text-2xl font-bold text-slate-100 mb-2">🎉 報價已送出！</h1>
           <p className="text-slate-400 mb-6">訂單 #{grabOk.order.orderNumber}</p>
+
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-5 mb-4">
+            <div className="text-xs text-emerald-300 mb-1">已確認車資</div>
+            <div className="text-3xl font-bold text-emerald-400 mb-1">
+              {quoteOk.priceCurrency === 'CNY' ? '¥' : 'HK$'} {quoteOk.confirmedPrice.toLocaleString()}
+            </div>
+            <div className="text-xs text-slate-400">乘客將收到通知，等待確認</div>
+          </div>
 
           <div className="bg-slate-900/50 border border-slate-600 rounded-lg p-6 mb-4 text-left space-y-3">
             <h3 className="text-sm font-medium text-slate-300 mb-2">📞 乘客聯繫方式</h3>
@@ -333,23 +379,148 @@ export default function DriverGrabPage() {
             )}
           </div>
 
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4 text-left">
-            <p className="text-sm text-amber-300 font-medium mb-1">您的資料</p>
-            <p className="text-xs text-slate-400">
-              {grabOk.driver.name} · {grabOk.driver.plate}
-            </p>
-            <p className="text-xs text-slate-500 mt-2">
-              請及時聯繫乘客確認行程細節
-            </p>
-          </div>
-
           <Link
             href={`tel:${grabOk.order.passengerPhone}`}
-            className="inline-flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold rounded-xl"
+            className="inline-flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-900 font-bold rounded-xl"
           >
             <Phone className="w-4 h-4" />
             立即聯繫乘客
           </Link>
+        </div>
+      </CenterShell>
+    )
+  }
+
+  // 搶單成功 + 尚未報價 → 顯示報價表單 + 乘客聯繫方式
+  if (grabOk) {
+    return (
+      <CenterShell>
+        <div className="max-w-md w-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 text-center">
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-green-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-100 mb-1">搶單成功！</h1>
+          <p className="text-sm text-slate-400 mb-5">訂單 #{grabOk.order.orderNumber}</p>
+
+          {/* 乘客聯繫方式（小卡片） */}
+          <div className="bg-slate-900/50 border border-slate-600 rounded-lg p-4 mb-5 text-left space-y-2">
+            <h3 className="text-xs font-medium text-slate-400 mb-1">📞 乘客聯繫方式</h3>
+            {grabOk.order.passengerName && (
+              <div className="flex items-center gap-2 text-sm">
+                <User className="w-4 h-4 text-cyan-400" />
+                <span className="text-slate-200">{grabOk.order.passengerName}</span>
+              </div>
+            )}
+            {grabOk.order.passengerPhone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="w-4 h-4 text-cyan-400" />
+                <a href={`tel:${grabOk.order.passengerPhone}`} className="text-cyan-400 underline">
+                  {grabOk.order.passengerPhone}
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* 報價表單 */}
+          <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-5 text-left">
+            <h3 className="text-base font-semibold text-slate-100 mb-1">💰 確認行程車資</h3>
+            <p className="text-xs text-slate-400 mb-4">請輸入您的最終報價（將推送給乘客）</p>
+
+            <div className="space-y-3">
+              {/* 幣種切換 */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">幣種</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrency('HKD')}
+                    className={`py-2 rounded-lg text-sm font-medium transition ${
+                      currency === 'HKD'
+                        ? 'bg-amber-500 text-slate-900'
+                        : 'bg-slate-900 border border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    🇭🇰 HKD 港幣
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrency('CNY')}
+                    className={`py-2 rounded-lg text-sm font-medium transition ${
+                      currency === 'CNY'
+                        ? 'bg-amber-500 text-slate-900'
+                        : 'bg-slate-900 border border-slate-600 text-slate-300'
+                    }`}
+                  >
+                    🇨🇳 CNY 人民幣
+                  </button>
+                </div>
+              </div>
+
+              {/* 價格輸入 */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">
+                  確認車資 <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    {currency === 'CNY' ? '¥' : 'HK$'}
+                  </span>
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="例如：800"
+                    min={1}
+                    className="w-full pl-14 pr-3 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-slate-100 text-base focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* 車型說明（選填） */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">
+                  車型說明 <span className="text-slate-500">（選填）</span>
+                </label>
+                <input
+                  type="text"
+                  value={vehicleModel}
+                  onChange={(e) => setVehicleModel(e.target.value)}
+                  placeholder="例如：7座埃爾法"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            {quoteErr && (
+              <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300">
+                {quoteErr}
+              </div>
+            )}
+
+            <button
+              onClick={handleQuoteSubmit}
+              disabled={quoteSubmitting || !price}
+              className="mt-4 w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 disabled:from-slate-600 disabled:to-slate-600 text-slate-900 font-bold rounded-xl flex items-center justify-center gap-2"
+            >
+              {quoteSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  送出中...
+                </>
+              ) : (
+                <>
+                  ✅ 確認報價並通知乘客
+                </>
+              )}
+            </button>
+
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4 text-xs text-slate-400">
+              <div className="flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <p>報價送出後不可修改；請確認金額準確無誤。</p>
+              </div>
+            </div>
+          </div>
         </div>
       </CenterShell>
     )
@@ -419,28 +590,6 @@ export default function DriverGrabPage() {
             ) : null}
           </div>
         </div>
-
-        {/* 釘釘 staff_id 提示 / 測試輸入框 */}
-        {!staffId && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-4">
-            <p className="text-sm text-amber-300 mb-2">⚠️ 缺少 staff_id（從釘釘 H5 入口會自動帶上）</p>
-            <p className="text-xs text-slate-400 mb-3">測試時可手動填入：</p>
-            <div className="flex gap-2">
-              <input
-                value={staffIdInput}
-                onChange={(e) => setStaffIdInput(e.target.value)}
-                placeholder="例如：staff_xxx 或 dingtalk_user_id"
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-slate-100 text-sm"
-              />
-              <button
-                onClick={handleSetStaffId}
-                className="px-4 py-2 bg-amber-500 text-slate-900 font-medium rounded-lg text-sm"
-              >
-                確認
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* 註冊表單（首次訪問） */}
         {needsRegistration && staffId ? (

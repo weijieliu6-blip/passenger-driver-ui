@@ -467,21 +467,21 @@ export default function HomePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     console.log('=== 表单提交 ===', formData)
-    
+
     // 驗證姓名和電話
     if (!formData.passengerName || !formData.passengerPhone) {
       alert('❌ 請填寫乘客姓名和電話')
       return
     }
-    
+
     // 验证出发地
     if (!formData.pickupLocation) {
       alert('❌ 請選擇出發地')
       return
     }
-    
+
     // 验证出发地区域（如果需要）
     if (isHkLocation(formData.pickupLocation) || isShanweiLocation(formData.pickupLocation) || isShenzhenLocation(formData.pickupLocation)) {
       if (!formData.pickupArea) {
@@ -489,13 +489,13 @@ export default function HomePage() {
         return
       }
     }
-    
+
     // 验证目的地
     if (!formData.dropoffLocation) {
       alert('❌ 請選擇目的地')
       return
     }
-    
+
     // 验证目的地区域（如果需要）
     if (isHkLocation(formData.dropoffLocation) || isShanweiLocation(formData.dropoffLocation) || isShenzhenLocation(formData.dropoffLocation)) {
       if (!formData.dropoffArea) {
@@ -503,24 +503,45 @@ export default function HomePage() {
         return
       }
     }
-    
+
     // 驗證日期和時間
     if (!formData.departureDate || !formData.departureTime) {
       alert('❌ 請選擇出發日期和時間')
       return
     }
-    
+
     // 验证孩童类型（如果勾选了孩童）
     if (formData.hasChild && !formData.childType) {
       alert('❌ 請選擇孩童年齡類型')
       return
     }
-    
+
+    // ✅ 訪客模式：彈出註冊提示（推薦註冊，可選擇跳過繼續訪客預約）
+    if (authState === 'guest') {
+      const choice = window.confirm(
+        '👋 建議先註冊帳號！\n\n' +
+        '✅ 註冊好處：\n' +
+        '  • 即時查看訂單狀態、司機報價\n' +
+        '  • 訂單歷史 / 電子收據\n' +
+        '  • 一鍵聯繫客服\n' +
+        '  • 收藏常用路線\n\n' +
+        '📝 點「確定」前往註冊/登入\n' +
+        '📝 點「取消」以訪客身份繼續預約'
+      )
+      if (choice) {
+        // 把 formData 存到 sessionStorage，登入後可恢復
+        sessionStorage.setItem('pendingBooking', JSON.stringify(formData))
+        router.push('/passenger/login?redirect=/')
+        return
+      }
+      // 用戶選擇「以訪客身份繼續」→ 繼續
+    }
+
     console.log('✅ 驗證通過，跳轉到確認頁面')
-    
+
     // 將表單數據存儲到 localStorage 以便在確認頁面使用
     localStorage.setItem('bookingData', JSON.stringify(formData))
-    
+
     // 跳轉到確認頁面
     router.push('/confirm')
   }

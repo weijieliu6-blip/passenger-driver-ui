@@ -272,3 +272,24 @@ export async function notifyOrderCancelled(
 乘客已取消此訂單，請勿接單`
   return postToDingTalk({ msgtype: 'text', text: { content: text } })
 }
+
+/**
+ * 司機確認價格通知
+ */
+export async function notifyOrderPriceConfirmed(
+  orderNumber: string,
+  driverName: string,
+  driverPhone: string,
+  price: number,
+  currency: 'HKD' | 'CNY'
+) {
+  const currencySymbol = currency === 'CNY' ? '¥' : 'HK$'
+  const text = `💰 價格已確認 #${orderNumber}
+
+司機：${driverName}
+電話：${driverPhone}
+確認車資：${currencySymbol} ${price.toLocaleString()}
+
+請等待乘客最終確認，祝您旅途愉快！`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
