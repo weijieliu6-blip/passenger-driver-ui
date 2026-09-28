@@ -1119,33 +1119,63 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
+        {/* Features Section - 始終三列並排（手機也並排，更緊湊） */}
+        <div className="mt-8 grid grid-cols-3 gap-3 md:gap-4">
+          <div className="text-center p-3 md:p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <MapPin className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.door2door')}</h3>
-            <p className="text-xs text-slate-400">{t('home.feature.door2door.desc')}</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-xs md:text-sm">{t('home.feature.door2door')}</h3>
+            <p className="text-[10px] md:text-xs text-slate-400 leading-relaxed">{t('home.feature.door2door.desc')}</p>
           </div>
 
-          <div className="text-center p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
+          <div className="text-center p-3 md:p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.no_commission')}</h3>
-            <p className="text-xs text-slate-400">{t('home.feature.no_commission.desc')}</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-xs md:text-sm">{t('home.feature.no_commission')}</h3>
+            <p className="text-[10px] md:text-xs text-slate-400 leading-relaxed">{t('home.feature.no_commission.desc')}</p>
           </div>
 
-          <div className="text-center p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
+          <div className="text-center p-3 md:p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <Calendar className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.fast_reply')}</h3>
-            <p className="text-xs text-slate-400">{t('home.feature.fast_reply.desc')}</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-xs md:text-sm">{t('home.feature.fast_reply')}</h3>
+            <p className="text-[10px] md:text-xs text-slate-400 leading-relaxed">{t('home.feature.fast_reply.desc')}</p>
           </div>
         </div>
       </main>
+
+      {/* Footer - 免責聲明 */}
+      <footer className="mt-12 mb-6 px-4 max-w-2xl mx-auto">
+        <div className="border-t border-slate-700/50 pt-6">
+          <h4 className="text-xs font-semibold text-slate-300 mb-3 flex items-center gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+            免責聲明
+          </h4>
+          <div className="text-[11px] text-slate-500 leading-relaxed space-y-2">
+            <p>
+              • 本平台僅提供司機與乘客的<strong className="text-slate-400">信息撮合服務</strong>，不參與任何行程的實際運營，亦不收取任何費用。
+            </p>
+            <p>
+              • 車資、路線及行程細節由司機與乘客<strong className="text-slate-400">自行協商並線下結算</strong>，平台不對交易內容承擔責任。
+            </p>
+            <p>
+              • 用戶應自行核實司機身份、車輛狀況及相關證件，<strong className="text-slate-400">謹慎選擇</strong>並對自身安全負責。
+            </p>
+            <p>
+              • 因行程中發生的任何<strong className="text-slate-400">人身、財產、交通糾紛</strong>，均由當事雙方依法律途徑解決，平台不承擔連帶責任。
+            </p>
+            <p className="pt-2 text-slate-600">
+              使用本平台即視為同意以上條款。如有疑問，請聯繫客服。
+            </p>
+          </div>
+          <p className="mt-4 text-[10px] text-slate-600 text-center">
+            © {new Date().getFullYear()} 中港車預約平台 · Cross-Border Taxi Booking
+          </p>
+        </div>
+      </footer>
     </div>
   )
 }
