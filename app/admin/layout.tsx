@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 
 /**
  * 後台最小版 layout（簡單 top nav）
@@ -23,9 +24,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </Link>
             </nav>
           </div>
-          <Link href="/" className="text-xs text-slate-400 hover:text-slate-200">
-            ← 返回前台
-          </Link>
+          <div className="flex items-center gap-3">
+            <LocaleSwitcher compact />
+            <Link href="/" className="text-xs text-slate-400 hover:text-slate-200">
+              ← 返回前台
+            </Link>
+          </div>
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>

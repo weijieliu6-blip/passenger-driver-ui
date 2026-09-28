@@ -7,6 +7,7 @@ import {
   Wallet, TrendingUp, ChevronRight, AlertCircle, CheckCircle,
   Sparkles, MapPin, FileText
 } from 'lucide-react'
+import { useT } from '@/components/i18n-provider'
 
 /**
  * 司機招募頁 — /driver
@@ -36,6 +37,7 @@ const BENEFITS = [
 
 export default function DriverRecruitPage() {
   const router = useRouter()
+  const t = useT()
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -151,13 +153,13 @@ export default function DriverRecruitPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-xs text-amber-300 mb-6">
               <Sparkles className="w-3 h-3" />
-              司機招募進行中
+              {t('recruit.subtitle')}
             </div>
             <h1 className="text-3xl md:text-5xl font-bold text-slate-50 mb-3">
-              🚖 加入中港車預約平台
+              🚖 {t('recruit.title')}
             </h1>
             <p className="text-base md:text-lg text-slate-400">
-              跨境專車司機招募中 — 接單自由、多勞多得
+              {t('recruit.subtitle')}
             </p>
           </div>
 
@@ -207,7 +209,7 @@ export default function DriverRecruitPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* 姓名 */}
-            <Field label="姓名 / 暱稱" icon={User} required>
+            <Field label={t('recruit.name')} icon={User} required>
               <input
                 value={form.name}
                 onChange={e => update('name', e.target.value)}
@@ -217,7 +219,7 @@ export default function DriverRecruitPage() {
             </Field>
 
             {/* 電話 */}
-            <Field label="聯絡電話（含區號）" icon={Phone} required>
+            <Field label={t('recruit.phone')} icon={Phone} required>
               <input
                 value={form.phone}
                 onChange={e => update('phone', e.target.value)}
@@ -227,7 +229,7 @@ export default function DriverRecruitPage() {
             </Field>
 
             {/* Email */}
-            <Field label="電郵（選填）" icon={Mail}>
+            <Field label={t('recruit.email')} icon={Mail}>
               <input
                 type="email"
                 value={form.email}
@@ -261,7 +263,7 @@ export default function DriverRecruitPage() {
 
             {/* 車牌 + 駕齡 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="車牌號碼" icon={Car} required>
+              <Field label={t('recruit.plate')} icon={Car} required>
                 <input
                   value={form.plate}
                   onChange={e => update('plate', e.target.value.toUpperCase())}
@@ -269,7 +271,7 @@ export default function DriverRecruitPage() {
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase"
                 />
               </Field>
-              <Field label="駕齡（年）" icon={Clock} required>
+              <Field label={t('recruit.years')} icon={Clock} required>
                 <input
                   type="number"
                   min={3}
@@ -331,7 +333,7 @@ export default function DriverRecruitPage() {
                 <>處理中...</>
               ) : (
                 <>
-                  提交申請
+                  {t('recruit.submit')}
                   <ChevronRight className="w-5 h-5" />
                 </>
               )}
