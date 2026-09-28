@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone } from 'lucide-react'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 
 export default function HomePage() {
   const router = useRouter()
@@ -536,6 +537,7 @@ export default function HomePage() {
           
           {/* 右上角用户入口 */}
           <div className="flex items-center gap-3">
+            <LocaleSwitcher />
             {authState === 'passenger' && (
               <button
                 onClick={() => router.push('/passenger/orders')}

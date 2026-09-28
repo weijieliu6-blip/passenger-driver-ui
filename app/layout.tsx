@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AnnouncementMarquee from "./components/announcement-marquee";
+import { I18nProvider } from "@/components/i18n-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,13 +22,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="zh-HK"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {/* 乘客端頂部跑馬燈（不影響 driver-app） */}
-        <AnnouncementMarquee />
-        {children}
+        {/* i18n provider 包整個 app，提供 t() + locale context */}
+        <I18nProvider>
+          {/* 乘客端頂部跑馬燈（不影響 driver-app） */}
+          <AnnouncementMarquee />
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );
