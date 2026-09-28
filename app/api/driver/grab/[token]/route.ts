@@ -168,10 +168,19 @@ export async function POST(
     // 3) 累加搶單次數（非關鍵，失敗不影響）
     incrementDriverGrab(driver.id).catch((e) => console.warn('incrementDriverGrab failed', e))
 
-    // 4) 釘釘通知（非阻塞）
-    notifyOrderGrabbed(result.order.order_number, driver.name, driver.phone).catch((e) =>
-      console.warn('notifyOrderGrabbed failed', e)
-    )
+    // 4) 釘釘「訂單已接」通知
+    console.log(`📣 準備推送「訂單已接」通知: #${result.order.order_number} by ${driver.name}`)
+    notifyOrderGrabbed(result.order.order_number, driver.name, driver.phone)
+      .then((pushResult) => {
+        if (pushResult?.success) {
+          console.log(`✅ 「訂單已接」推送成功: #${result.order.order_number}`)
+        } else {
+          console.error(`❌ 「訂單已接」推送失敗: #${result.order.order_number}`, pushResult?.error)
+        }
+      })
+      .catch((e) => {
+        console.error(`❌ 「訂單已接」推送異常: #${result.order.order_number}`, e)
+      })
 
     // 5) 回傳乘客聯繫方式（給司機下一步打電話用）
     return NextResponse.json({
