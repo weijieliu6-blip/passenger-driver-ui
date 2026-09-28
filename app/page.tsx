@@ -858,25 +858,33 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* 🗺️ 地圖：當用戶選擇了具體地點，顯示地圖輔助確認位置 */}
-              {formData.pickupArea && (() => {
-                const mapLocations = getLocationsByArea(formData.pickupLocation)
+              {/* 🗺️ Uber 風格地圖：同時顯示起點（綠）+ 終點（紅）+ 連線 */}
+              {(formData.pickupLocation || formData.dropoffLocation) && (() => {
+                const pickupMapLocations = formData.pickupLocation
+                  ? getLocationsByArea(formData.pickupLocation)
+                  : []
+                const dropoffMapLocations = formData.dropoffLocation
+                  ? getLocationsByArea(formData.dropoffLocation)
+                  : []
+                if (pickupMapLocations.length === 0 && dropoffMapLocations.length === 0) {
+                  return null
+                }
                 return (
                   <div className="mt-3 animate-fadeIn">
-                    <label className="block text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      地圖位置（點擊標記可切換上車點）
+                    <label className="block text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                      行程路線預覽
+                      <span className="ml-1 text-slate-500 text-[10px]">· 點擊 marker 可切換</span>
                     </label>
                     <PickupMap
-                      locations={mapLocations}
-                      selectedName={formData.pickupArea}
-                      onSelect={(loc) => setFormData({ ...formData, pickupArea: loc.name })}
+                      height="320px"
+                      pickupLocations={pickupMapLocations}
+                      pickupName={formData.pickupArea || null}
+                      onPickupSelect={(loc) => setFormData({ ...formData, pickupArea: loc.name })}
+                      dropoffLocations={dropoffMapLocations}
+                      dropoffName={formData.dropoffArea || null}
+                      onDropoffSelect={(loc) => setFormData({ ...formData, dropoffArea: loc.name })}
                     />
-                    {formData.pickupArea && (
-                      <p className="mt-1.5 text-xs text-slate-500">
-                        📍 已選擇：<span className="text-cyan-400 font-medium">{formData.pickupArea}</span>
-                      </p>
-                    )}
                   </div>
                 )
               })()}
