@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import {
   User, Phone, Mail, Car, ShieldCheck, Star, Clock,
   Wallet, TrendingUp, ChevronRight, AlertCircle, CheckCircle,
-  Sparkles, MapPin, FileText
+  Sparkles, MapPin, FileText, Globe
 } from 'lucide-react'
 import { useT } from '@/components/i18n-provider'
+import { LocaleSwitcher } from '@/components/locale-switcher'
 
 /**
  * 司機招募頁 — /driver
@@ -22,18 +23,18 @@ import { useT } from '@/components/i18n-provider'
 
 type CarType = 'sedan_5' | 'alphard_7' | 'business_9'
 
-const CAR_TYPES: { value: CarType; label: string; emoji: string; desc: string }[] = [
-  { value: 'sedan_5', label: '5 座豐田 Camry', emoji: '🚗', desc: '日常通勤 / 小家庭首選' },
-  { value: 'alphard_7', label: '7 座埃爾法', emoji: '🚙', desc: '商務 / 多人行李首選' },
-  { value: 'business_9', label: '9 座商務車', emoji: '🚐', desc: '團體 / 大行李首選' },
+const CAR_TYPES: { value: CarType; labelKey: string; emoji: string; descKey: string }[] = [
+  { value: 'sedan_5', labelKey: 'car.sedan_5', emoji: '🚗', descKey: 'recruit.car.sedan.desc' },
+  { value: 'alphard_7', labelKey: 'car.alphard_7', emoji: '🚙', descKey: 'recruit.car.alphard.desc' },
+  { value: 'business_9', labelKey: 'car.business_9', emoji: '🚐', descKey: 'recruit.car.business.desc' },
 ]
 
-const BENEFITS = [
-  { icon: Wallet, title: '月入穩定', desc: '平台直派單，無中間抽成壓力' },
-  { icon: Clock, title: '時間彈性', desc: '24 小時可搶單，自由安排出車時間' },
-  { icon: TrendingUp, title: '收入透明', desc: '完成訂單越多，獎金 / 評分加成' },
-  { icon: ShieldCheck, title: '平台擔保', desc: '糾紛處理 + 旅客聯繫平台居中協調' },
-]
+const BENEFIT_KEYS = [
+  { icon: Wallet, titleKey: 'recruit.benefit.income.title', descKey: 'recruit.benefit.income.desc' },
+  { icon: Clock, titleKey: 'recruit.benefit.flex.title', descKey: 'recruit.benefit.flex.desc' },
+  { icon: TrendingUp, titleKey: 'recruit.benefit.trans.title', descKey: 'recruit.benefit.trans.desc' },
+  { icon: ShieldCheck, titleKey: 'recruit.benefit.safe.title', descKey: 'recruit.benefit.safe.desc' },
+] as const
 
 export default function DriverRecruitPage() {
   const router = useRouter()
@@ -63,15 +64,15 @@ export default function DriverRecruitPage() {
     setError(null)
 
     // 基本驗證
-    if (!form.name.trim()) return setError('請填寫姓名')
-    if (!form.phone.trim()) return setError('請填寫聯絡電話')
-    if (!form.plate.trim()) return setError('請填寫車牌號碼')
+    if (!form.name.trim()) return setError(t('recruit.error.name'))
+    if (!form.phone.trim()) return setError(t('recruit.error.phone'))
+    if (!form.plate.trim()) return setError(t('recruit.error.plate'))
     if (!form.drivingYears || +form.drivingYears < 3) {
-      return setError('駕齡至少 3 年（含跨境經驗者優先）')
+      return setError(t('recruit.error.years'))
     }
     const phoneClean = form.phone.replace(/[\s-+]/g, '')
     if (!/^(\+?852\d{8}|\+?861[3-9]\d{9}|852\d{8}|1[3-9]\d{9})$/.test(phoneClean)) {
-      return setError('電話格式不正確（+852 香港 / +86 內地）')
+      return setError(t('recruit.error.phone_fmt'))
     }
 
     setSubmitting(true)
@@ -93,13 +94,13 @@ export default function DriverRecruitPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
-        setError(data.error || '提交失敗，請稍後重試')
+        setError(data.error || t('recruit.error.generic'))
         return
       }
       setSuccess(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '網絡錯誤，請稍後重試')
+      setError(err instanceof Error ? err.message : t('recruit.error.network'))
     } finally {
       setSubmitting(false)
     }
@@ -112,32 +113,32 @@ export default function DriverRecruitPage() {
           <div className="w-20 h-20 mx-auto bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mb-6">
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-amber-300 mb-3">申請已收到！</h1>
+          <h1 className="text-2xl font-bold text-amber-300 mb-3">{t('recruit.success')}</h1>
           <p className="text-slate-300 mb-2">
-            我們已記錄您提交的司機資料：
+            {t('recruit.success.note')}
           </p>
           <div className="bg-slate-900/50 rounded-2xl p-4 my-6 text-left text-sm text-slate-200">
             <div className="grid grid-cols-2 gap-2">
-              <div className="text-slate-500">姓名</div>
+              <div className="text-slate-500">{t('recruit.success.field.name')}</div>
               <div className="font-medium">{form.name}</div>
-              <div className="text-slate-500">電話</div>
+              <div className="text-slate-500">{t('recruit.success.field.phone')}</div>
               <div className="font-medium">{form.phone}</div>
-              <div className="text-slate-500">車牌</div>
+              <div className="text-slate-500">{t('recruit.success.field.plate')}</div>
               <div className="font-medium">{form.plate}</div>
-              <div className="text-slate-500">車型</div>
+              <div className="text-slate-500">{t('recruit.success.field.car')}</div>
               <div className="font-medium">
-                {CAR_TYPES.find(c => c.value === form.carType)?.label}
+                {t(CAR_TYPES.find(c => c.value === form.carType)?.labelKey ?? 'car.alphard_7')}
               </div>
             </div>
           </div>
           <p className="text-sm text-amber-300 mb-6">
-            📞 我們會在 24 小時內致電 <span className="font-bold">{form.phone}</span> 核對資料並安排培訓。
+            {t('recruit.success.call')} <span className="font-bold">{form.phone}</span>
           </p>
           <button
             onClick={() => router.push('/')}
             className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 rounded-xl font-medium transition"
           >
-            返回主頁
+            {t('recruit.back_home')}
           </button>
         </div>
       </div>
@@ -146,6 +147,11 @@ export default function DriverRecruitPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-900/20 via-slate-900 to-slate-900">
+      {/* 頂部語言切換 */}
+      <div className="absolute top-4 right-4 z-30">
+        <LocaleSwitcher />
+      </div>
+
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent" />
@@ -153,7 +159,7 @@ export default function DriverRecruitPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-full text-xs text-amber-300 mb-6">
               <Sparkles className="w-3 h-3" />
-              {t('recruit.subtitle')}
+              {t('recruit.badge')}
             </div>
             <h1 className="text-3xl md:text-5xl font-bold text-slate-50 mb-3">
               🚖 {t('recruit.title')}
@@ -165,11 +171,11 @@ export default function DriverRecruitPage() {
 
           {/* Benefits grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-            {BENEFITS.map(b => (
-              <div key={b.title} className="bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-4">
+            {BENEFIT_KEYS.map(b => (
+              <div key={b.titleKey} className="bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-4">
                 <b.icon className="w-5 h-5 text-amber-400 mb-2" />
-                <div className="text-sm font-bold text-slate-100 mb-1">{b.title}</div>
-                <div className="text-xs text-slate-400 leading-relaxed">{b.desc}</div>
+                <div className="text-sm font-bold text-slate-100 mb-1">{t(b.titleKey)}</div>
+                <div className="text-xs text-slate-400 leading-relaxed">{t(b.descKey)}</div>
               </div>
             ))}
           </div>
@@ -178,15 +184,15 @@ export default function DriverRecruitPage() {
           <div className="grid grid-cols-3 gap-2 mb-10 text-center">
             <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4">
               <div className="text-2xl md:text-3xl font-bold text-amber-300 mb-1">2hr</div>
-              <div className="text-xs text-slate-400">平均回覆</div>
+              <div className="text-xs text-slate-400">{t('recruit.stat.reply')}</div>
             </div>
             <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4">
               <div className="text-2xl md:text-3xl font-bold text-amber-300 mb-1">24h</div>
-              <div className="text-xs text-slate-400">全時段搶單</div>
+              <div className="text-xs text-slate-400">{t('recruit.stat.247')}</div>
             </div>
             <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4">
               <div className="text-2xl md:text-3xl font-bold text-amber-300 mb-1">0%</div>
-              <div className="text-xs text-slate-400">中間抽成</div>
+              <div className="text-xs text-slate-400">{t('recruit.stat.commission')}</div>
             </div>
           </div>
         </div>
@@ -195,9 +201,9 @@ export default function DriverRecruitPage() {
       {/* Form */}
       <div className="max-w-2xl mx-auto px-4 pb-16">
         <div className="bg-slate-800/70 backdrop-blur border border-amber-500/20 rounded-3xl p-6 md:p-8 shadow-2xl shadow-amber-500/10">
-          <h2 className="text-xl font-bold text-amber-300 mb-1">📋 司機資料登記</h2>
+          <h2 className="text-xl font-bold text-amber-300 mb-1">{t('recruit.form_title')}</h2>
           <p className="text-sm text-slate-400 mb-6">
-            填妥後我們將於 24 小時內聯繫您，補完跨境證件審核即可正式搶單。
+            {t('recruit.form_subtitle')}
           </p>
 
           {error && (
@@ -213,7 +219,7 @@ export default function DriverRecruitPage() {
               <input
                 value={form.name}
                 onChange={e => update('name', e.target.value)}
-                placeholder="例如：陳先生 / 偉師傅"
+                placeholder={t('recruit.name.placeholder')}
                 className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </Field>
@@ -223,7 +229,7 @@ export default function DriverRecruitPage() {
               <input
                 value={form.phone}
                 onChange={e => update('phone', e.target.value)}
-                placeholder="+852 9123 4567 / +86 138 0013 8000"
+                placeholder={t('recruit.phone.placeholder')}
                 className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </Field>
@@ -240,7 +246,7 @@ export default function DriverRecruitPage() {
             </Field>
 
             {/* 車型 */}
-            <Field label="主要車型（單選）" icon={Car} required>
+            <Field label={t('recruit.car_type')} icon={Car} required>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {CAR_TYPES.map(c => (
                   <button
@@ -254,8 +260,8 @@ export default function DriverRecruitPage() {
                     }`}
                   >
                     <div className="text-lg mb-0.5">{c.emoji}</div>
-                    <div className="text-sm font-bold">{c.label}</div>
-                    <div className="text-xs opacity-70">{c.desc}</div>
+                    <div className="text-sm font-bold">{t(c.labelKey)}</div>
+                    <div className="text-xs opacity-70">{t(c.descKey)}</div>
                   </button>
                 ))}
               </div>
@@ -267,7 +273,7 @@ export default function DriverRecruitPage() {
                 <input
                   value={form.plate}
                   onChange={e => update('plate', e.target.value.toUpperCase())}
-                  placeholder="例如：HK 1234 / 粤 B 12345"
+                  placeholder={t('recruit.plate.placeholder')}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase"
                 />
               </Field>
@@ -278,18 +284,18 @@ export default function DriverRecruitPage() {
                   max={50}
                   value={form.drivingYears}
                   onChange={e => update('drivingYears', e.target.value)}
-                  placeholder="例如：5"
+                  placeholder={t('recruit.years.placeholder')}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </Field>
             </div>
 
             {/* 常駐地 */}
-            <Field label="常駐城市（選填）" icon={MapPin}>
+            <Field label={t('recruit.city')} icon={MapPin}>
               <input
                 value={form.city}
                 onChange={e => update('city', e.target.value)}
-                placeholder="例如：香港 / 深圳"
+                placeholder={t('recruit.city.placeholder')}
                 className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </Field>
@@ -305,20 +311,20 @@ export default function DriverRecruitPage() {
               <div className="flex-1 text-sm">
                 <div className="flex items-center gap-1 text-slate-100 font-medium">
                   <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  已持有跨境運輸證件
+                  {t('recruit.permit')}
                 </div>
                 <div className="text-slate-400 text-xs mt-1 leading-relaxed">
-                  包括「中港車牌」、「粵港澳直通車牌」、「CIK 證」或相關運輸許可
+                  {t('recruit.permit.desc')}
                 </div>
               </div>
             </label>
 
             {/* 備註 */}
-            <Field label="其他備註（選填）" icon={FileText}>
+            <Field label={t('recruit.message')} icon={FileText}>
               <textarea
                 value={form.message}
                 onChange={e => update('message', e.target.value)}
-                placeholder="例如：可出車時段、語言能力、過往跨境經驗..."
+                placeholder={t('recruit.message.placeholder')}
                 rows={3}
                 className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
               />
@@ -330,7 +336,7 @@ export default function DriverRecruitPage() {
               className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold text-lg py-4 px-6 rounded-xl hover:from-amber-400 hover:to-orange-400 focus:outline-none focus:ring-4 focus:ring-amber-500/50 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting ? (
-                <>處理中...</>
+                <>{t('btn.loading')}</>
               ) : (
                 <>
                   {t('recruit.submit')}
@@ -340,7 +346,7 @@ export default function DriverRecruitPage() {
             </button>
 
             <p className="text-xs text-slate-500 text-center">
-              提交即同意我們聯繫您核對資料並安排後續培訓
+              {t('recruit.consent')}
             </p>
           </form>
         </div>
@@ -348,9 +354,9 @@ export default function DriverRecruitPage() {
         {/* Footer */}
         <div className="mt-8 text-center">
           <div className="inline-flex items-center gap-3 text-xs text-slate-500">
-            <span>🚖 中港車預約平台</span>
+            <span>🚖 {t('recruit.footer.brand')}</span>
             <span>·</span>
-            <span>客服 <a href="tel:+85200000000" className="text-amber-400 hover:text-amber-300">+852</a></span>
+            <span>{t('recruit.footer.cs')} <a href="tel:+85200000000" className="text-amber-400 hover:text-amber-300">+852</a></span>
             <span>·</span>
             <span>v1.0</span>
           </div>

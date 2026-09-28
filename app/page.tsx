@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/locale-switcher'
+import { useT } from '@/components/i18n-provider'
 
 export default function HomePage() {
   const router = useRouter()
+  const t = useT()
   const [authState, setAuthState] = useState<'loading' | 'guest' | 'passenger'>('loading')
   
   // 檢查登入狀態
@@ -552,8 +554,8 @@ export default function HomePage() {
       <header className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">中港跨境專車預約服務</h1>
-            <p className="text-sm text-slate-400 mt-1">專業跨境接送 · 安全舒適便捷</p>
+            <h1 className="text-2xl font-bold text-slate-50">{t('home.page_title')}</h1>
+            <p className="text-sm text-slate-400 mt-1">{t('home.page_subtitle')}</p>
           </div>
           
           {/* 右上角用户入口 */}
@@ -564,7 +566,7 @@ export default function HomePage() {
                 onClick={() => router.push('/passenger/orders')}
                 className="text-slate-300 text-sm font-medium hover:text-cyan-400 transition-colors"
               >
-                我的訂單
+                {t('nav.my_orders')}
               </button>
             )}
             <button
@@ -575,7 +577,7 @@ export default function HomePage() {
                 <User className="w-4 h-4 text-white" />
               </div>
               <span className="text-slate-300 text-sm font-medium group-hover:text-cyan-400 transition-colors">
-                {authState === 'passenger' ? '個人中心' : '登入/註冊'}
+                {authState === 'passenger' ? t('nav.profile') : t('nav.login')}
               </span>
             </button>
           </div>
@@ -591,7 +593,7 @@ export default function HomePage() {
               <Car className="w-6 h-6 text-slate-900" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-slate-50">專業跨境接送服務</h3>
+              <h3 className="text-lg font-bold text-slate-50">{t('home.page_subtitle')}</h3>
               <p className="text-xs text-cyan-300">安全 · 舒適 · 便捷</p>
             </div>
           </div>
@@ -613,9 +615,9 @@ export default function HomePage() {
             <div className="text-center p-2 bg-slate-900/30 rounded-lg">
               <div className="flex items-center justify-center gap-1 mb-0.5">
                 <CheckCircle className="w-3 h-3 text-cyan-400" />
-                <span className="text-xs font-medium text-slate-300">服務狀態</span>
+                <span className="text-xs font-medium text-slate-300">{t('home.service_status')}</span>
               </div>
-              <div className="text-base font-bold text-green-400">正常</div>
+              <div className="text-base font-bold text-green-400">{t('home.service_normal')}</div>
             </div>
           </div>
         </div>
@@ -628,8 +630,8 @@ export default function HomePage() {
                 <User className="w-4 h-4 text-white" />
               </div>
               <div>
-                <div className="text-sm font-medium text-cyan-400">乘客已登入</div>
-                <div className="text-xs text-slate-400">將自動記錄訂單</div>
+                <div className="text-sm font-medium text-cyan-400">{t('home.logged_in.title')}</div>
+                <div className="text-xs text-slate-400">{t('home.logged_in.desc')}</div>
               </div>
             </div>
             <button
@@ -637,7 +639,7 @@ export default function HomePage() {
               onClick={() => router.push('/passenger/profile/edit')}
               className="text-xs text-cyan-400 hover:text-cyan-300"
             >
-              編輯資料
+              {t('home.logged_in.edit')}
             </button>
           </div>
         )}
@@ -645,8 +647,8 @@ export default function HomePage() {
         {/* 預約表單卡片 */}
         <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-2xl p-6 shadow-xl">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-50 mb-1">預約您的行程</h2>
-            <p className="text-sm text-slate-400">填寫以下信息，我們將為您匹配合適的司機</p>
+            <h2 className="text-2xl font-bold text-slate-50 mb-1">{t('home.book_section.title')}</h2>
+            <p className="text-sm text-slate-400">{t('home.book_section.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -655,7 +657,7 @@ export default function HomePage() {
               <div>
                 <label htmlFor="passengerName" className="block text-sm font-medium text-slate-300 mb-2">
                   <User className="inline w-4 h-4 mr-1" />
-                  乘客姓名
+                  {t('form.name')}
                 </label>
                 <input
                   type="text"
@@ -663,15 +665,15 @@ export default function HomePage() {
                   required
                   value={formData.passengerName}
                   onChange={(e) => setFormData({ ...formData, passengerName: e.target.value })}
-                  placeholder="請輸入姓名"
+                  placeholder={t('home.book_section.name_ph')}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="passengerPhone" className="block text-sm font-medium text-slate-300 mb-2">
                   <Phone className="inline w-4 h-4 mr-1" />
-                  聯繫電話
+                  {t('form.contact')}
                 </label>
                 <input
                   type="tel"
@@ -679,7 +681,7 @@ export default function HomePage() {
                   required
                   value={formData.passengerPhone}
                   onChange={(e) => setFormData({ ...formData, passengerPhone: e.target.value })}
-                  placeholder="請輸入電話號碼"
+                  placeholder={t('home.book_section.phone_ph')}
                   className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                 />
               </div>
@@ -689,7 +691,7 @@ export default function HomePage() {
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 <Car className="inline w-4 h-4 mr-1" />
-                選擇服務
+                {t('form.service_type')}
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <button
@@ -701,7 +703,7 @@ export default function HomePage() {
                       : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                   }`}
                 >
-                  <div className="font-medium">🌏 跨境專車</div>
+                  <div className="font-medium">🌏 {t('form.service.cross_border')}</div>
                 </button>
                 <button
                   type="button"
@@ -712,7 +714,7 @@ export default function HomePage() {
                       : 'border-slate-600 bg-slate-900/30 text-slate-400 hover:border-slate-500'
                   }`}
                 >
-                  <div className="font-medium">🚗 內地專車</div>
+                  <div className="font-medium">🚗 {t('form.service.mainland_local')}</div>
                 </button>
               </div>
             </div>
@@ -1082,7 +1084,7 @@ export default function HomePage() {
               type="submit"
               className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-900 font-bold text-lg py-4 px-6 rounded-xl hover:from-cyan-400 hover:to-teal-400 focus:outline-none focus:ring-4 focus:ring-cyan-500/50 transition-all shadow-lg shadow-cyan-500/20 transform hover:scale-[1.01] active:scale-[0.99]"
             >
-              立即預約
+              {t('form.submit')}
             </button>
 
             {/* 預估車資顯示 */}
@@ -1119,24 +1121,24 @@ export default function HomePage() {
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <MapPin className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">點對點接送</h3>
-            <p className="text-xs text-slate-400">香港到內地門對門服務</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.door2door')}</h3>
+            <p className="text-xs text-slate-400">{t('home.feature.door2door.desc')}</p>
           </div>
 
           <div className="text-center p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <Users className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">零抽成撮合</h3>
-            <p className="text-xs text-slate-400">平台不抽成，價格更優惠</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.no_commission')}</h3>
+            <p className="text-xs text-slate-400">{t('home.feature.no_commission.desc')}</p>
           </div>
 
           <div className="text-center p-4 bg-slate-800/30 border border-slate-700/30 rounded-lg">
             <div className="w-10 h-10 bg-cyan-500/10 rounded-lg flex items-center justify-center mx-auto mb-2">
               <Calendar className="w-5 h-5 text-cyan-400" />
             </div>
-            <h3 className="font-semibold text-slate-200 mb-1 text-sm">快速響應</h3>
-            <p className="text-xs text-slate-400">實時派單，快速匹配司機</p>
+            <h3 className="font-semibold text-slate-200 mb-1 text-sm">{t('home.feature.fast_reply')}</h3>
+            <p className="text-xs text-slate-400">{t('home.feature.fast_reply.desc')}</p>
           </div>
         </div>
       </main>
