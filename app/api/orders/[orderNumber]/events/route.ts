@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCurrentDriver } from '@/lib/auth-server'
 import type { RideEventType } from '@/lib/driver-tracking'
+import {
+  notifyDriverArrived,
+  notifyTripStarted,
+  notifyTripCompleted,
+  notifyDriverMessage,
+} from '@/lib/dingtalk'
 
 /**
  * 司機端推送行程事件（抵達/上車/完成/訊息）
@@ -77,13 +83,26 @@ export async function POST(
     // 取出訂單並驗證歸屬
     const { data: order, error: orderErr } = await supabaseAdmin
       .from('orders')
-      .select('order_number, status, driver_id, driver_name')
+      .select(
+        'order_number, status, driver_id, driver_name, driver_phone, ' +
+          'pickup_location, pickup_area, dropoff_location, dropoff_area, ' +
+          'passenger_name, confirmed_price, price_currency, completed_at'
+      )
       .eq('order_number', orderNumber)
       .single<{
         order_number: string
         status: string
         driver_id: string | null
         driver_name: string | null
+        driver_phone: string | null
+        pickup_location: string
+        pickup_area: string | null
+        dropoff_location: string
+        dropoff_area: string | null
+        passenger_name: string | null
+        confirmed_price: number | null
+        price_currency: string | null
+        completed_at: string | null
       }>()
     if (orderErr || !order) {
       return NextResponse.json({ error: '訂單不存在' }, { status: 404 })
@@ -147,6 +166,21 @@ export async function POST(
       // 訂單更新失敗不應回滾事件（事件已是事實記錄）
     }
 
+    // 行程階段同步推送釘釘群（非同步、try/catch；失敗不影響事件 API 回應）
+    // 注意：訊息 / 抵達 / 上車 / 完成 都要推；status_changed / price_confirmed 不推（避免重複噪音）
+    const now = new Date()
+    const arrivalLabel = now.toLocaleString('zh-HK', { hour12: false })
+    void pushDingTalkNotification(eventType, {
+      order,
+      driverName: driver.name,
+      driverPhone: order.driver_phone,
+      message,
+      arrivalLabel,
+      completedAt: order.completed_at ?? arrivalLabel,
+    }).catch((pushErr) => {
+      console.error('[POST events] dingtalk push failed:', pushErr)
+    })
+
     return NextResponse.json({
       success: true,
       eventType,
@@ -159,5 +193,84 @@ export async function POST(
       { error: err instanceof Error ? err.message : '伺服器錯誤' },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * 內部：依事件型別對應推送到釘釘群。失敗僅 log，不拋出。
+ */
+async function pushDingTalkNotification(
+  eventType: RideEventType,
+  ctx: {
+    order: {
+      order_number: string
+      pickup_location: string
+      pickup_area: string | null
+      dropoff_location: string
+      dropoff_area: string | null
+      passenger_name: string | null
+      confirmed_price: number | null
+      price_currency: string | null
+    }
+    driverName: string
+    driverPhone: string | null
+    message?: string | undefined
+    arrivalLabel: string
+    completedAt: string
+  }
+): Promise<void> {
+  const o = ctx.order
+  switch (eventType) {
+    case 'driver_arrived':
+      await notifyDriverArrived(
+        o.order_number,
+        ctx.driverName,
+        ctx.driverPhone,
+        o.pickup_location,
+        o.pickup_area,
+        o.passenger_name,
+        ctx.arrivalLabel
+      )
+      return
+    case 'driver_picked_up':
+    case 'trip_started':
+      await notifyTripStarted(
+        o.order_number,
+        ctx.driverName,
+        ctx.driverPhone,
+        o.pickup_location,
+        o.pickup_area,
+        o.dropoff_location,
+        o.dropoff_area,
+        o.passenger_name,
+        ctx.arrivalLabel
+      )
+      return
+    case 'trip_completed':
+      await notifyTripCompleted(
+        o.order_number,
+        ctx.driverName,
+        o.pickup_location,
+        o.pickup_area,
+        o.dropoff_location,
+        o.dropoff_area,
+        o.passenger_name,
+        o.confirmed_price,
+        o.price_currency as 'HKD' | 'CNY' | null,
+        ctx.completedAt
+      )
+      return
+    case 'message':
+      if (!ctx.message) return
+      await notifyDriverMessage(
+        o.order_number,
+        ctx.driverName,
+        o.passenger_name,
+        ctx.message
+      )
+      return
+    default:
+      // status_changed / price_confirmed → 不推（避免重複／噪音）
+      return
   }
 }

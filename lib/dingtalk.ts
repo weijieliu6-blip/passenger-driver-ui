@@ -74,6 +74,7 @@ async function postToDingTalk(payload: unknown): Promise<{ success: boolean; err
 /**
  * 推播新訂單文字訊息（保留向後相容；新流程請用 pushOrderActionCard）
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function sendDingTalkNotification(orderData: any) {
   const direction = orderData.direction || ''
   const pickup = orderData.pickupLocation || ''
@@ -139,6 +140,7 @@ export async function pushOrderText(opts: {
         : '跨境專車'
 
   // [測試模式] 若 body.testMode=true 則加 [測試] 前綴，方便測試訂單辨識
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isTest = (opts as any).testMode === true
   const headerLine = isTest ? '🧪 [測試] 新訂單 - 待接單' : '🚗 新訂單 - 待接單'
   // 注意：testMode 從呼叫端傳入（由 API route 從 request body 讀取）
@@ -311,6 +313,8 @@ export async function notifyOrderAcceptedByPassenger(
   currency: 'HKD' | 'CNY',
   passengerName: string,
   passengerPhone: string,
+  // driverName 預留給未來模板擴充（v1.1 起將在訊息顯示司機姓名）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   driverName?: string | null
 ) {
   const currencySymbol = currency === 'CNY' ? '¥' : 'HK$'
@@ -333,5 +337,136 @@ export async function notifyOrderAcceptedByPassenger(
 📞 聯繫：${passengerPhone}
 
 請準時於出發地點接送乘客，保持電話暢通。祝您旅途愉快！`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
+
+// ============== 行程階段通知（v1 追蹤系統） ==============
+
+/**
+ * 司機抵達上車點通知（推送到釘釘群）
+ *
+ * 觸發：司機在 execute 頁點擊「已抵達上車點」
+ * 內容：訂單編號 + 司機姓名 + 上車地點 + 聯繫電話
+ */
+export async function notifyDriverArrived(
+  orderNumber: string,
+  driverName: string,
+  driverPhone: string | null | undefined,
+  pickupLocation: string,
+  pickupArea: string | null | undefined,
+  passengerName: string | null | undefined,
+  arrivalTime: string
+) {
+  const pickupText = pickupArea ? `${pickupLocation} - ${pickupArea}` : pickupLocation
+  const passengerLine = passengerName ? `請乘客 ${passengerName} 準備上車` : '請乘客準備上車'
+  const phoneLine = driverPhone ? `\n📞 司機聯繫：${driverPhone}` : ''
+
+  const text = `📍 司機已抵達 #${orderNumber}
+
+司機：${driverName}${phoneLine}
+到達時間：${arrivalTime}
+
+🚏 上車地點：${pickupText}
+
+${passengerLine}。`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
+
+/**
+ * 行程開始通知（乘客已上車，推送到釘釘群）
+ *
+ * 觸發：司機在 execute 頁點擊「乘客已上車 / 行程開始」
+ * 內容：訂單編號 + 司機 + 路線 + 預計抵達時間
+ */
+export async function notifyTripStarted(
+  orderNumber: string,
+  driverName: string,
+  driverPhone: string | null | undefined,
+  pickupLocation: string,
+  pickupArea: string | null | undefined,
+  dropoffLocation: string,
+  dropoffArea: string | null | undefined,
+  passengerName: string | null | undefined,
+  startedAt: string
+) {
+  const pickupText = pickupArea ? `${pickupLocation} - ${pickupArea}` : pickupLocation
+  const dropoffText = dropoffArea ? `${dropoffLocation} - ${dropoffArea}` : dropoffLocation
+  const phoneLine = driverPhone ? `\n📞 司機聯繫：${driverPhone}` : ''
+  const passengerLine = passengerName ? `乘客：${passengerName}` : '乘客已上車'
+
+  const text = `🚗 行程開始 #${orderNumber}
+
+${passengerLine}，司機 ${driverName} 已出發${phoneLine}
+出發時間：${startedAt}
+
+🚏 ${pickupText} → 🏁 ${dropoffText}
+
+敬請期待。`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
+
+/**
+ * 行程完成通知（已抵達目的地，推送到釘釘群）
+ *
+ * 觸發：司機在 execute 頁點擊「行程已完成」
+ * 內容：訂單編號 + 司機 + 路線 + 確認金額 + 完成時間
+ */
+export async function notifyTripCompleted(
+  orderNumber: string,
+  driverName: string,
+  pickupLocation: string,
+  pickupArea: string | null | undefined,
+  dropoffLocation: string,
+  dropoffArea: string | null | undefined,
+  passengerName: string | null | undefined,
+  price: number | null | undefined,
+  currency: 'HKD' | 'CNY' | null | undefined,
+  completedAt: string
+) {
+  const pickupText = pickupArea ? `${pickupLocation} - ${pickupArea}` : pickupLocation
+  const dropoffText = dropoffArea ? `${dropoffLocation} - ${dropoffArea}` : dropoffLocation
+
+  let priceLine = ''
+  if (price != null && currency) {
+    const symbol = currency === 'CNY' ? '¥' : 'HK$'
+    priceLine = `\n💰 確認車資：${symbol} ${price.toLocaleString()}`
+  }
+
+  const passengerLine = passengerName ? `乘客：${passengerName}` : '乘客'
+
+  const text = `✅ 行程完成 #${orderNumber}
+
+${passengerLine} 已順利抵達目的地。
+完成時間：${completedAt}
+
+🚏 ${pickupText} → 🏁 ${dropoffText}${priceLine}
+
+司機：${driverName}，感謝您的服務！`
+  return postToDingTalk({ msgtype: 'text', text: { content: text } })
+}
+
+/**
+ * 司機發送訊息通知（推送到釘釘群）
+ *
+ * 觸發：司機在 execute 頁傳送文字訊息
+ * 內容：訂單編號 + 司機姓名 + 訊息內容（會過濾電話號碼避免隱私外洩）
+ */
+export async function notifyDriverMessage(
+  orderNumber: string,
+  driverName: string,
+  passengerName: string | null | undefined,
+  message: string
+) {
+  // 安全過濾：將連續 8 碼以上數字遮罩，避免司機／乘客電話外洩
+  const safeMessage = message
+    .replace(/\d{8,}/g, (m) => `${m.slice(0, 2)}****${m.slice(-2)}`)
+    .slice(0, 200)
+
+  const passengerLine = passengerName ? `給乘客 ${passengerName}` : '給乘客'
+
+  const text = `💬 司機訊息 #${orderNumber}
+
+司機 ${driverName} ${passengerLine}：
+「${safeMessage}」`
   return postToDingTalk({ msgtype: 'text', text: { content: text } })
 }
