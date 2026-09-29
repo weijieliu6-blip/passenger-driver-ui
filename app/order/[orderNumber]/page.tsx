@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   MapPin, Calendar, Users, Car, Clock, Phone, User, AlertCircle,
   CheckCircle, XCircle, CreditCard, ChevronRight, MessageCircle,
-  Shield, Sparkles, Edit
+  Shield, Sparkles, Edit, Navigation
 } from 'lucide-react'
 import OrderWaitCard from '@/app/components/order-wait-card'
 
@@ -241,10 +241,17 @@ export default function OrderDetailPage() {
             <div className="w-10 h-10 bg-sky-500/20 rounded-full flex items-center justify-center flex-shrink-0">
               <CheckCircle className="w-5 h-5 text-sky-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-sky-300">司機已接單</p>
               <p className="text-xs text-slate-400 mt-0.5">司機確認後將會輸入最終報價，請留意通知</p>
             </div>
+            <Link
+              href={`/passenger/track/${orderNumber}`}
+              className="px-3 py-2 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              追蹤
+            </Link>
           </div>
         )}
 
@@ -253,10 +260,17 @@ export default function OrderDetailPage() {
             <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
               <CreditCard className="w-5 h-5 text-emerald-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-emerald-300">司機已報價</p>
               <p className="text-xs text-slate-400 mt-0.5">請聯繫司機確認行程細節</p>
             </div>
+            <Link
+              href={`/passenger/track/${orderNumber}`}
+              className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              即時追蹤
+            </Link>
           </div>
         )}
 

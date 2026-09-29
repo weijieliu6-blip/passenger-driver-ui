@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Phone, Search, Clock, MapPin, Users, Luggage, Car, X, ArrowLeft, CheckCircle2, AlertCircle, Loader2, User } from 'lucide-react'
+import { Phone, Search, Clock, MapPin, Users, Luggage, Car, X, ArrowLeft, AlertCircle, Loader2, User, Navigation, CheckCircle2 } from 'lucide-react'
 
 interface Order {
   id: string
@@ -525,6 +525,15 @@ function PassengerOrdersContent() {
                           </div>
                         )}
                       </div>
+                      {/* 即時追蹤入口 */}
+                      <Link
+                        href={`/passenger/track/${order.order_number}`}
+                        onClick={e => e.stopPropagation()}
+                        className="mt-3 w-full py-2 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        即時追蹤司機位置
+                      </Link>
                     </div>
                   )}
 

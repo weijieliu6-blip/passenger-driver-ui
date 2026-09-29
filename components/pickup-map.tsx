@@ -439,41 +439,74 @@ export default function PickupMap({
           )}
         </MapContainer>
 
-        {/* 右上角浮層：距離 + 預計行程時間 + 抵達時間 */}
+        {/* ETA 行程卡：抵達時間為主視覺，其他資訊集中呈現 */}
         {(distanceKm !== null || eta) && (
-          <div className="absolute top-3 right-3 z-[400] space-y-1.5">
-            {eta && (
-              <div className="bg-slate-900/90 backdrop-blur border border-cyan-700/60 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                預計行程
-                <span className="font-semibold text-cyan-300">
-                  {eta.totalMinutes} 分鐘
-                </span>
-                {isCrossBorder(pickupCoord, dropoffCoord) && (
-                  <span className="ml-1 text-amber-400 text-[10px]">
-                    ·含通關
-                  </span>
+          <div className="pointer-events-none absolute top-4 right-4 z-[400] w-[min(320px,calc(100%-2rem))]">
+            <div className="overflow-hidden rounded-2xl border border-white/15 bg-slate-950/88 text-slate-100 shadow-[0_18px_45px_rgba(2,8,23,0.42)] backdrop-blur-xl">
+              <div className="h-1 bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400" />
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      行程預估
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-100">
+                      {isCrossBorder(pickupCoord, dropoffCoord) ? '跨境接送' : '點對點接送'}
+                    </p>
+                  </div>
+                  {isCrossBorder(pickupCoord, dropoffCoord) && (
+                    <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">
+                      已含通關
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium text-slate-400">預計抵達</p>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold leading-none tracking-tight text-white">
+                        {arrivalTime?.label ?? `${eta?.totalMinutes ?? '--'} 分鐘`}
+                      </span>
+                      {arrivalTime?.crossDay && (
+                        <span className="text-[10px] font-medium text-amber-300">翌日</span>
+                      )}
+                    </div>
+                  </div>
+                  {eta && (
+                    <div className="flex shrink-0 items-center gap-1.5 rounded-xl bg-cyan-400/10 px-2.5 py-2 text-cyan-200 ring-1 ring-inset ring-cyan-300/15">
+                      <Clock className="h-4 w-4 text-cyan-300" />
+                      <span className="text-xs font-semibold">{eta.totalMinutes} 分鐘</span>
+                    </div>
+                  )}
+                </div>
+
+                {pickupCoord && dropoffCoord && (
+                  <div className="mt-4 flex items-center gap-2 text-[11px] text-slate-300">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 ring-4 ring-emerald-400/10" />
+                    <span className="min-w-0 truncate">{pickupCoord.name}</span>
+                    <span className="h-px min-w-5 flex-1 bg-gradient-to-r from-emerald-400/60 via-slate-500/40 to-rose-400/60" />
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-rose-400 ring-4 ring-rose-400/10" />
+                    <span className="min-w-0 truncate text-right">{dropoffCoord.name}</span>
+                  </div>
                 )}
+
+                <div className="mt-4 grid grid-cols-2 divide-x divide-white/10 border-t border-white/10 pt-3">
+                  <div className="pr-3">
+                    <p className="text-[10px] text-slate-500">行程距離</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {distanceKm !== null ? `${distanceKm.toFixed(1)} km` : '--'}
+                    </p>
+                  </div>
+                  <div className="pl-3">
+                    <p className="text-[10px] text-slate-500">時間估算</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {isCrossBorder(pickupCoord, dropoffCoord) ? '含 30 分鐘通關' : '含接送緩衝'}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
-            {arrivalTime && (
-              <div className="bg-slate-900/90 backdrop-blur border border-emerald-700/60 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-                <span className="text-emerald-400">⏰</span>
-                抵達時間
-                <span className="font-semibold text-emerald-300">
-                  {arrivalTime.label}
-                </span>
-                {arrivalTime.crossDay && (
-                  <span className="text-amber-400 text-[10px]">·翌日</span>
-                )}
-              </div>
-            )}
-            {distanceKm !== null && (
-              <div className="bg-slate-900/85 backdrop-blur border border-slate-700/70 text-slate-100 text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5">
-                <span className="text-cyan-400">●</span>
-                距離 <span className="font-semibold text-cyan-300">{distanceKm.toFixed(1)} km</span>
-              </div>
-            )}
+            </div>
           </div>
         )}
       </div>

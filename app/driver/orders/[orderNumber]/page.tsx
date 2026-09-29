@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   MapPin, Calendar, Users, Car, Phone, User, AlertCircle,
   CheckCircle, ArrowLeft, CreditCard, Luggage, Baby, Clock,
-  LogOut, FileText, ShieldCheck
+  LogOut, FileText, ShieldCheck, Navigation
 } from 'lucide-react'
 
 interface Order {
@@ -34,6 +34,7 @@ interface Order {
   driver_name?: string | null
   driver_plate?: string | null
   driver_phone?: string | null
+  completed_at?: string | null
 }
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -163,6 +164,7 @@ export default function DriverOrderDetailPage() {
 
   const isPending = order.status === 'grabbed' && !order.confirmed_price
   const isPriceConfirmed = order.status === 'price_confirmed' || order.confirmed_price
+  const isActive = ['grabbed', 'price_confirmed'].includes(order.status) && !order.completed_at
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-amber-900/20 to-slate-900">
@@ -494,6 +496,25 @@ export default function DriverOrderDetailPage() {
             <p className="text-sm text-slate-300 mt-3">
               ✅ 乘客已收到您的報價，請保持電話暢通以便乘客聯繫
             </p>
+          </div>
+        )}
+
+        {/* 行程執行入口（報價完成後即可進入） */}
+        {isActive && order.confirmed_price && (
+          <div className="bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border border-cyan-500/30 rounded-2xl p-6 mb-4">
+            <h2 className="text-lg font-semibold text-slate-100 mb-2 flex items-center gap-2">
+              <Navigation className="w-5 h-5 text-cyan-400" />
+              開始行程
+            </h2>
+            <p className="text-sm text-slate-400 mb-4">
+              進入行程執行頁面，系統將自動上報您的位置，並可在「抵達 / 上車 / 完成」三個階段即時通知乘客。
+            </p>
+            <Link
+              href={`/driver/orders/${orderNumber}/execute`}
+              className="block w-full text-center py-3 bg-gradient-to-r from-cyan-500 to-sky-500 text-slate-900 font-bold rounded-xl hover:from-cyan-400 hover:to-sky-400 transition"
+            >
+              進入行程執行 →
+            </Link>
           </div>
         )}
       </main>
