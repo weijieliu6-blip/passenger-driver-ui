@@ -11,10 +11,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // 服務端客戶端（API 路由中使用）
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!serviceRoleKey) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is required in production. ' +
+      'Using anon key here would bypass RLS for admin operations.'
+    )
+  }
+  console.warn(
+    '[supabase] SUPABASE_SERVICE_ROLE_KEY not set, falling back to anon key. ' +
+    'This is unsafe for admin operations — only use in local development.'
+  )
+}
+const adminKey = serviceRoleKey || supabaseAnonKey
+
 export const supabaseAdmin = createClient(
   supabaseUrl,
-  serviceRoleKey,
+  adminKey,
   {
     auth: {
       autoRefreshToken: false,

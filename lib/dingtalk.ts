@@ -457,9 +457,11 @@ export async function notifyDriverMessage(
   passengerName: string | null | undefined,
   message: string
 ) {
-  // 安全過濾：將連續 8 碼以上數字遮罩，避免司機／乘客電話外洩
+  // 安全過濾：將連續 8 碼以上數字遮罩，避免司機／乘客電話外洩；
+  // 將 @ 替換為 Unicode 變體避免在釘釘群 @ 所有人 / @特定用戶（M5）。
   const safeMessage = message
     .replace(/\d{8,}/g, (m) => `${m.slice(0, 2)}****${m.slice(-2)}`)
+    .replace(/@/g, '@\u200B') // zero-width space，避免觸發 @mention
     .slice(0, 200)
 
   const passengerLine = passengerName ? `給乘客 ${passengerName}` : '給乘客'
