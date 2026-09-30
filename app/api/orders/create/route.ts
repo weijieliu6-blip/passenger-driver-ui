@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { pushOrderText } from '@/lib/dingtalk'
 import { getCurrentPassenger } from '@/lib/auth-server'
+import { rateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * 创建订单 API
@@ -9,8 +10,22 @@ import { getCurrentPassenger } from '@/lib/auth-server'
  */
 export async function POST(request: NextRequest) {
   try {
+    // 強制要求乘客必須登入才能下單（rate limit 前先驗身份，避免 IP 共享導致誤擋）
+    const currentPassenger = await getCurrentPassenger(request)
+    if (!currentPassenger) {
+      return NextResponse.json(
+        { error: '請先登入或註冊乘客帳號', code: 'AUTH_REQUIRED' },
+        { status: 401 }
+      )
+    }
+
+    // Rate limit：訂單建立。每 passenger 1 req / 30s（防 spam / 防 DoS）
+    // 改為 per-user：避免公司 NAT、共享 WiFi 等多使用者共用 IP 時被誤擋
+    const rl = rateLimit(`orderCreate:${currentPassenger.id}`, RATE_LIMITS.orderCreate)
+    if (!rl.allowed) return rateLimitResponse(rl.resetMs)
+
     const body = await request.json()
-    
+
     // 验证必填字段
     const requiredFields = [
       'direction',
@@ -21,7 +36,7 @@ export async function POST(request: NextRequest) {
       'vehicleType',
       'passengerPhone'
     ]
-    
+
     for (const field of requiredFields) {
       if (!body[field]) {
         return NextResponse.json(
@@ -30,7 +45,35 @@ export async function POST(request: NextRequest) {
         )
       }
     }
-    
+
+    // 新欄位：詳細地址、座標、zone（向下相容：缺少時留 null）
+    const pickupAddress = body.pickupAddress || null
+    const dropoffAddress = body.dropoffAddress || null
+    const pickupLat = typeof body.pickupLat === 'number' ? body.pickupLat : null
+    const pickupLng = typeof body.pickupLng === 'number' ? body.pickupLng : null
+    const dropoffLat = typeof body.dropoffLat === 'number' ? body.dropoffLat : null
+    const dropoffLng = typeof body.dropoffLng === 'number' ? body.dropoffLng : null
+    const pickupZoneCode = body.pickupZoneCode || null
+    const dropoffZoneCode = body.dropoffZoneCode || null
+    let estimatedFare = body.estimatedFare || null
+    // 實際 pricing 計算移到 supabaseAdmin 宣告後
+
+    // 驗證出發時間不能在過去（最少提前 30 分鐘）
+    if (body.departureTime) {
+      const depTime = new Date(body.departureTime)
+      const now = new Date()
+      const minLeadMs = 30 * 60 * 1000
+      if (isNaN(depTime.getTime())) {
+        return NextResponse.json({ error: '出發時間格式無效' }, { status: 400 })
+      }
+      if (depTime.getTime() < now.getTime() + minLeadMs) {
+        return NextResponse.json(
+          { error: '出發時間不能早於當前時間 30 分鐘' },
+          { status: 400 }
+        )
+      }
+    }
+
     // 转换 direction 字段（兼容新旧值）
     // 新值: hk_to_mainland | mainland_to_hk | sz_to_sw | sw_to_sz
     // 旧值（数据库枚举）: to_mainland | to_hk
@@ -45,21 +88,38 @@ export async function POST(request: NextRequest) {
     }
     
     // 硬编码正确的 URL（临时修复环境变量缓存问题）
-    const supabaseUrl = 'https://vuuamydahzhpajjdvokl.supabase.co'
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-    
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL 未設定')
+    }
+
     console.log('🔍 使用 Supabase URL:', supabaseUrl)
-    
-    // 尝试获取当前登入乘客（可选，未登入也能下单）
-    const currentPassenger = await getCurrentPassenger(request)
-    
+
     // 创建 Supabase 客户端
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     })
+
+    // 若前端沒帶 estimatedFare 且有 zone，後端自己用 RPC 算
+    if (estimatedFare == null && pickupZoneCode && dropoffZoneCode) {
+      try {
+        const { data: priceData } = await supabaseAdmin.rpc('get_pricing_estimate', {
+          p_pickup_zone: pickupZoneCode,
+          p_dropoff_zone: dropoffZoneCode,
+          p_vehicle_type: body.vehicleType,
+          p_departure_time: body.departureTime || null,
+        })
+        if (priceData?.found) {
+          estimatedFare = Number(priceData.total_price)
+        }
+      } catch (e) {
+        console.warn('[orders/create] pricing RPC failed, fallback to null:', e)
+      }
+    }
     
     // 调用 generate_order_number RPC
     const orderNumberRes = await fetch(`${supabaseUrl}/rest/v1/rpc/generate_order_number`, {
@@ -104,45 +164,102 @@ export async function POST(request: NextRequest) {
     const dispatchDeadlineAt = new Date()
     dispatchDeadlineAt.setHours(dispatchDeadlineAt.getHours() + 24)
 
-    // 插入订单数据
-    const { data: order, error: insertError } = await supabaseAdmin
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        grab_token: grabToken,
-        grab_token_expires_at: tokenExpiresAt.toISOString(),
-        dispatch_deadline_at: dispatchDeadlineAt.toISOString(),
-        direction: dbDirection,
-        pickup_location: body.pickupLocation,
-        pickup_area: body.pickupArea || null,
-        dropoff_location: body.dropoffLocation,
-        dropoff_area: body.dropoffArea || null,
-        departure_time: body.departureTime,
-        passengers: body.passengers,
-        luggage: body.luggage || 0,
-        vehicle_type: body.vehicleType,
-        is_charter: body.isCharter || false,
-        has_child: body.hasChild || false,
-        child_type: body.childType || null,
-        passenger_name: body.passengerName || null,
-        passenger_phone: body.passengerPhone,
-        passenger_notes: body.passengerNotes || null,
-        passenger_id: currentPassenger?.id || null,
-        // 預估車資（取中間值）
-        estimated_fare: body.estimatedFare || null,
-        status: 'pending',
-        // 分級推送時間戳：黃金即時 / 白金 +60s / 普通 +120s
-        gold_released_at: new Date().toISOString(),
-        platinum_released_at: new Date(Date.now() + 60 * 1000).toISOString(),
-        normal_released_at: new Date(Date.now() + 120 * 1000).toISOString(),
-        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-        dingtalk_pushed: false
-      })
-      .select()
-      .single()
-    
-    if (insertError) {
-      throw new Error('创建订单失败: ' + insertError.message)
+    // 插入订单数据（含重试：race condition 导致 order_number 衝突时重新取号）
+    // 部署時跑 advisory lock migration（supabase/migrations/20260930_order_number_advisory_lock.sql）
+    // 可以從根本上避免衝突；應用層 retry 仍是必要的安全網（防禦性）。
+    const MAX_INSERT_RETRIES = 10
+    let order = null
+    let lastInsertError = null
+    for (let attempt = 0; attempt < MAX_INSERT_RETRIES; attempt++) {
+      // 第 1 次使用已取的 orderNumber；後續每次重取
+      let currentOrderNumber = orderNumber
+      let currentGrabToken = grabToken
+      if (attempt > 0) {
+        const retryOrderNumberRes = await fetch(`${supabaseUrl}/rest/v1/rpc/generate_order_number`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Prefer': 'return=representation',
+          },
+        })
+        const retryGrabTokenRes = await fetch(`${supabaseUrl}/rest/v1/rpc/generate_grab_token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': serviceRoleKey,
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Prefer': 'return=representation',
+          },
+        })
+        if (!retryOrderNumberRes.ok || !retryGrabTokenRes.ok) {
+          throw new Error(`生成訂單號/token 失敗 (retry ${attempt})`)
+        }
+        currentOrderNumber = (await retryOrderNumberRes.json()) as string
+        currentGrabToken = (await retryGrabTokenRes.json()) as string
+        // 指數退避 + 隨機抖動，避免 retry storm
+        await new Promise(r => setTimeout(r, 80 + attempt * 80 + Math.floor(Math.random() * 80)))
+      }
+
+      const res = await supabaseAdmin
+        .from('orders')
+        .insert({
+          order_number: currentOrderNumber,
+          grab_token: currentGrabToken,
+          grab_token_expires_at: tokenExpiresAt.toISOString(),
+          dispatch_deadline_at: dispatchDeadlineAt.toISOString(),
+          direction: dbDirection,
+          pickup_location: body.pickupLocation,
+          pickup_area: body.pickupArea || null,
+          pickup_address: pickupAddress,
+          pickup_lat: pickupLat,
+          pickup_lng: pickupLng,
+          dropoff_location: body.dropoffLocation,
+          dropoff_area: body.dropoffArea || null,
+          dropoff_address: dropoffAddress,
+          dropoff_lat: dropoffLat,
+          dropoff_lng: dropoffLng,
+          pickup_zone: pickupZoneCode,
+          dropoff_zone: dropoffZoneCode,
+          departure_time: body.departureTime,
+          passengers: body.passengers,
+          luggage: body.luggage || 0,
+          vehicle_type: body.vehicleType,
+          is_charter: body.isCharter || false,
+          has_child: body.hasChild || false,
+          child_type: body.childType || null,
+          passenger_name: currentPassenger.name,
+          passenger_phone: currentPassenger.phone,
+          passenger_notes: body.passengerNotes || null,
+          passenger_id: currentPassenger.id,
+          estimated_fare: estimatedFare,
+          status: 'pending',
+          gold_released_at: new Date().toISOString(),
+          platinum_released_at: new Date(Date.now() + 60 * 1000).toISOString(),
+          normal_released_at: new Date(Date.now() + 120 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          dingtalk_pushed: false,
+        })
+        .select()
+        .single()
+
+      if (!res.error) {
+        order = res.data
+        break
+      }
+
+      lastInsertError = res.error
+      // 只有「唯一約束衝突」才重試；其他錯誤直接失敗
+      const isUniqueViolation = res.error.code === '23505' || /duplicate key/i.test(res.error.message || '')
+      if (!isUniqueViolation) {
+        throw new Error('创建订单失败: ' + res.error.message)
+      }
+      console.warn(`[orders/create] insert 重試 ${attempt + 1}/${MAX_INSERT_RETRIES}，原因: ${res.error.message}`)
+    }
+
+    if (!order) {
+      throw new Error('创建订单失败（重试 ' + MAX_INSERT_RETRIES + ' 次后仍衝突）: ' + (lastInsertError?.message ?? 'unknown'))
     }
     
     console.log('✅ 订单创建成功:', order.order_number)
@@ -190,7 +307,17 @@ export async function POST(request: NextRequest) {
         status: order.status,
         grabToken: order.grab_token,
         grabTokenExpiresAt: order.grab_token_expires_at,
-        createdAt: order.created_at
+        createdAt: order.created_at,
+        // 同步回傳詳細欄位（讓前端可立即顯示，不需再 GET）
+        estimatedFare: order.estimated_fare,
+        pickupZone: order.pickup_zone,
+        pickupAddress: order.pickup_address,
+        pickupLat: order.pickup_lat,
+        pickupLng: order.pickup_lng,
+        dropoffZone: order.dropoff_zone,
+        dropoffAddress: order.dropoff_address,
+        dropoffLat: order.dropoff_lat,
+        dropoffLng: order.dropoff_lng,
       }
     })
     
@@ -225,8 +352,11 @@ export async function GET(request: NextRequest) {
     }
     
     // 硬编码正确的 URL（临时修复环境变量缓存问题）
-    const supabaseUrl = 'https://vuuamydahzhpajjdvokl.supabase.co'
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL 未設定')
+    }
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,
