@@ -1,0 +1,62 @@
+# Vercel 部署排除清單
+# 用法：放在專案根目錄（與 next.config.ts 同層）
+
+# Node / Next.js
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# 環境 / 機密
+.env
+.env.local
+.env.*.local
+.vercel
+
+# 開發 / 除錯腳本
+check-*.js
+check-*.mjs
+test-*.js
+test-*.mjs
+try-*.mjs
+print-*.mjs
+list-*.mjs
+e2e-*.mjs
+seed-*.mjs
+stress-*.mjs
+test-*.mjs
+
+# Internal migration runner（一次性 dev 用，不部署）
+app/api/_internal/
+cleanup-*.js
+cleanup-*.sql
+status-test-direct.json
+
+# 日誌 / 監測
+*.log
+*.err
+*.out
+build-output.log
+monitor.err
+monitor.out
+next-dev*.log
+next-dev*.err
+tscheck.log
+
+# IDE / OS
+.DS_Store
+.vscode
+.cursor
+*.pem
+
+# Driver 子專案（如果主部署只跑根目錄）
+driver-app/node_modules
+driver-app/.next
+driver-app/.env*
+
+# 文件（docs 可保留，這裡預設排除）
+# CURRENT_STATUS.md
+# DEVELOPMENT.md
+# docs/
