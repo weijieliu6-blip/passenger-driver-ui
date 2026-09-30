@@ -1,24 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findDriverByStaffId, registerDriver, grabOrderAtomically, incrementDriverGrab } from '@/lib/driver-pool'
+import { findDriverByStaffId } from '@/lib/driver-pool'
 import { notifyOrderGrabbed } from '@/lib/dingtalk'
+import { getCurrentDriver } from '@/lib/auth-server'
+import { supabaseAdmin } from '@/lib/supabase'
+import { rateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * v1 釘釘搶單 — 司機池註冊 + 搶單
  *
+ * 已棄用「以 staff_id 自動註冊 + 搶單」的舊流程（C4 漏洞）：
+ *   - 任何人拿到任意 staff_id 就能冒充該司機註冊並搶單。
+ *
+ * 新流程（v2）：
+ *   - 強制要求司機已透過 Supabase Auth cookie 登入。
+ *   - GET 仍支援 ?staff_id= 作為輔助識別（向後相容）；
+ *     POST 不再接受 body 註冊，僅用登入司機自己的 driver_info。
+ *   - 搶單成功 UPDATE 同時清空 grab_token 防止重用（H4）。
+ *
  * GET  /api/driver/grab/[token]?staff_id=xxx
- *   → 查詢訂單是否可搶；若 staff_id 已綁定司機就回傳已註冊狀態
+ *   → 查詢訂單是否可搶；若 cookie 已登入司機 → 回傳該司機狀態
  *
  * POST /api/driver/grab/[token]
- *   body: { staff_id, name?, phone?, plate?, car_type?, driving_years?, seats? }
- *   → 若 staff_id 已存在於 drivers 表 → 直接搶單
- *   → 否則 → 用剩餘欄位註冊後搶單
- *
- * 並發安全：以 `UPDATE orders SET status='grabbed' WHERE grab_token=... AND status='pending'`
- *         作為原子守門；沒搶到就回 409（已被搶）或 410（過期）
+ *   → 司機必須已登入（cookie）；無需 body；原子搶單
  */
 
 interface GrabRequestBody {
-  staff_id: string
+  staff_id?: string
   name?: string
   phone?: string
   plate?: string
@@ -30,9 +37,6 @@ interface GrabRequestBody {
 function bad(message: string, status = 400) {
   return NextResponse.json({ success: false, error: message }, { status })
 }
-
-const CAR_TYPE_MAP = ['sedan_5', 'alphard_7', 'business_9'] as const
-const SEATS = [5, 7, 9] as const
 
 export async function GET(
   request: NextRequest,
@@ -68,9 +72,28 @@ export async function GET(
       )
     }
 
-    // 查司機是否已註冊
+    // 查司機狀態：優先 cookie，其次 staff_id（向後相容 / UI 顯示）
+    const driver = await getCurrentDriver(request)
     let existing = null
-    if (staffId) {
+    if (driver) {
+      // 從 driver_info 查公開資訊
+      const { data } = await supabaseAdmin
+        .from('driver_info')
+        .select('vehicle_plate, vehicle_model, rating, driving_years, membership_tier')
+        .eq('id', driver.id)
+        .maybeSingle()
+      existing = data
+        ? {
+            id: driver.id,
+            name: driver.name,
+            phone: driver.phone,
+            plate: data.vehicle_plate,
+            carType: data.vehicle_model,
+            membershipTier: data.membership_tier,
+          }
+        : { id: driver.id, name: driver.name, phone: driver.phone }
+    } else if (staffId) {
+      // 僅用於 UI 顯示「請登入」前的狀態；不能用於搶單
       try {
         existing = await findDriverByStaffId(staffId)
       } catch {
@@ -83,6 +106,7 @@ export async function GET(
       order,
       driver: existing,
       needsRegistration: !existing,
+      authenticated: !!driver,
     })
   } catch (error) {
     console.error('[GET /api/driver/grab/[token]] error:', error)
@@ -98,92 +122,132 @@ export async function POST(
     const { token } = await params
     if (!token) return bad('缺少 token')
 
-    const body = (await request.json()) as GrabRequestBody
-    if (!body.staff_id || typeof body.staff_id !== 'string') {
-      return bad('缺少 staff_id')
-    }
-
-    // 1) 確保司機存在
-    let driver = await findDriverByStaffId(body.staff_id).catch(() => null)
+    // Rate limit：搶單（POST）。
+    // 改為 per-driver：原本 key 是 grab:${token}，每 token 各算一次，
+    //   導致單一司機可以無限搶不同訂單（撞不到限流）；改為 grab:${driverId}。
+    // 先做 auth 才能拿到 driverId
+    const driver = await getCurrentDriver(request)
     if (!driver) {
-      // 第一次註冊：必填欄位驗證
-      const missing: string[] = []
-      if (!body.name) missing.push('name')
-      if (!body.phone) missing.push('phone')
-      if (!body.plate) missing.push('plate')
-      if (!body.car_type) missing.push('car_type')
-      if (body.driving_years === undefined || body.driving_years === null) missing.push('driving_years')
-      if (!body.seats) missing.push('seats')
-      if (missing.length > 0) {
-        return bad(`缺少必填欄位: ${missing.join(', ')}`)
-      }
-
-      // 簡單格式驗證
-      const phoneOk = /^[\d\-\+\s]{6,20}$/.test(body.phone!)
-      if (!phoneOk) return bad('電話格式不正確')
-      const dy = Number(body.driving_years)
-      if (!Number.isFinite(dy) || dy < 0 || dy > 50) return bad('駕齡需為 0-50 之間的整數')
-      if (!CAR_TYPE_MAP.includes(body.car_type!)) return bad('不支援的車類型')
-      if (!SEATS.includes(body.seats!)) return bad('座位數需為 5/7/9')
-
-      try {
-        driver = await registerDriver({
-          dingtalk_staff_id: body.staff_id,
-          name: body.name!,
-          phone: body.phone!,
-          plate: body.plate!,
-          car_type: body.car_type!,
-          driving_years: dy,
-          seats: body.seats!,
-        })
-      } catch (e) {
-        return bad('註冊司機失敗：' + (e instanceof Error ? e.message : '未知錯誤'))
-      }
-    }
-
-    // 2) 原子搶單
-    const result = await grabOrderAtomically(
-      token,
-      driver.id,
-      driver.name,
-      driver.phone,
-      driver.plate
-    )
-
-    if (!result.ok) {
-      if (result.reason === 'not_found') return bad('訂單不存在', 404)
-      if (result.reason === 'expired') {
-        return NextResponse.json(
-          { success: false, status: 'expired', message: '訂單已過期' },
-          { status: 410 }
-        )
-      }
-      // already_grabbed
       return NextResponse.json(
-        { success: false, status: 'grabbed', message: '來晚了，訂單已被其他司機搶走' },
-        { status: 409 }
+        {
+          success: false,
+          error: '請先登入司機帳號',
+          requireLogin: true,
+          loginUrl: `/driver/login?redirect=${encodeURIComponent(`/driver/grab/${token}`)}`,
+        },
+        { status: 401 }
       )
     }
 
-    // 3) 累加搶單次數（非關鍵，背景執行即可）
-    incrementDriverGrab(driver.id).catch((e) => console.warn('incrementDriverGrab failed', e))
+    const rl = rateLimit(`grab:${driver.id}`, RATE_LIMITS.grab)
+    if (!rl.allowed) {
+      const seconds = Math.ceil(rl.resetMs / 1000)
+      return NextResponse.json(
+        { success: false, error: `請求太頻繁，請於 ${seconds} 秒後重試` },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(seconds) },
+        }
+      )
+    }
 
-    // 4) 釘釘「訂單已接」通知 — 必須 await，否則 Vercel serverless function
-    //    return response 後會 freeze，background promise 會被中斷
-    console.log(`📣 推送「訂單已接」通知: #${result.order.order_number} by ${driver.name}`)
+    // 1) 強制要求司機已登入（已上移，這裡僅保留註解）
+
+    // body 已忽略——不再支援 staff_id 註冊 / 改姓名 / 改電話
+    // 保留 body 解析僅為偵錯舊呼叫端
+    try {
+      const _body = (await request.json()) as GrabRequestBody
+      void _body
+    } catch {
+      // 空 body 也是合法的
+    }
+
+    // 2) 確保 driver_info 存在（首次登入後尚未填資料的司機不能搶單）
+    const { data: driverInfo } = await supabaseAdmin
+      .from('driver_info')
+      .select('vehicle_plate')
+      .eq('id', driver.id)
+      .maybeSingle()
+
+    if (!driverInfo?.vehicle_plate) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '請先完善車牌資料',
+          requireProfileUpdate: true,
+          profileUrl: '/driver/profile',
+        },
+        { status: 400 }
+      )
+    }
+
+    const driverPlate = driverInfo.vehicle_plate
+
+    // 3) 原子搶單 + 清空 grab_token 防止重用（H4）
+    //    grab_token 欄位目前 NOT NULL + UNIQUE（migration 20260930 才會改），
+    //    用 '__CONSUMED__-<ts>-<rand>' 作為唯一 sentinel；後續 deployment 跑 migration 後可改回 NULL
+    const consumedMarker = '__CONSUMED__-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
+    const { data: order, error: updateError } = await supabaseAdmin
+      .from('orders')
+      .update({
+        status: 'grabbed',
+        driver_id: driver.id,
+        driver_name: driver.name,
+        driver_phone: driver.phone,
+        driver_plate: driverPlate,
+        grabbed_at: new Date().toISOString(),
+        accepted_at: new Date().toISOString(),
+        first_driver_offered_at: new Date().toISOString(),
+        grab_token: consumedMarker,
+      })
+      .eq('grab_token', token)
+      .eq('status', 'pending')
+      .select()
+      .single()
+
+    if (updateError || !order) {
+      const { data: currentOrder } = await supabaseAdmin
+        .from('orders')
+        .select('status, order_number')
+        .eq('grab_token', token)
+        .single()
+
+      if (currentOrder?.status === 'grabbed' || currentOrder?.status === 'price_confirmed') {
+        return NextResponse.json({
+          success: false,
+          status: currentOrder.status,
+          message: '來晚了，訂單已被其他司機搶走',
+        })
+      }
+
+      return NextResponse.json(
+        { error: '搶單失敗，訂單可能已被搶或已過期' },
+        { status: 400 }
+      )
+    }
+
+    console.log(
+      '✅ 訂單被搶:',
+      order.order_number,
+      '司機:',
+      driver.name,
+      '(ID:',
+      driver.id,
+      ')'
+    )
+
+    // 4) 釘釘「訂單已接」通知
     try {
       const pushResult = await notifyOrderGrabbed(
-        result.order.order_number,
+        order.order_number,
         driver.name,
         driver.phone
       )
-      if (pushResult?.success) {
-        console.log(`✅ 「訂單已接」推送成功: #${result.order.order_number}`)
-      } else {
-        console.error(`❌ 「訂單已接」推送失敗: #${result.order.order_number}`, pushResult?.error)
+      if (!pushResult?.success) {
+        console.error(`❌ 「訂單已接」推送失敗: #${order.order_number}`, pushResult?.error)
       }
     } catch (e) {
-      console.error(`❌ 「訂單已接」推送異常: #${result.order.order_number}`, e)
+      console.error(`❌ 「訂單已接」推送異常: #${order.order_number}`, e)
     }
 
     // 5) 回傳乘客聯繫方式（給司機下一步打電話用）
@@ -194,12 +258,12 @@ export async function POST(
         id: driver.id,
         name: driver.name,
         phone: driver.phone,
-        plate: driver.plate,
+        plate: driverPlate,
       },
       order: {
-        orderNumber: result.order.order_number,
-        passengerName: result.order.passenger_name,
-        passengerPhone: result.order.passenger_phone,
+        orderNumber: order.order_number,
+        passengerName: order.passenger_name,
+        passengerPhone: order.passenger_phone,
       },
     })
   } catch (error) {

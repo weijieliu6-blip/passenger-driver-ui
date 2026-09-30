@@ -188,24 +188,25 @@ export default function DriverDashboard() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* 提示橫幅：新流程說明 */}
-        <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <Award className="w-5 h-5 text-amber-400" />
+        {/* 接單大廳入口（醒目 CTA） */}
+        <Link
+          href="/driver/hall"
+          className="block bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 border-2 border-cyan-500/40 rounded-2xl p-5 hover:border-cyan-400/60 transition-all group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-110 transition-transform">
+              <Sparkles className="w-7 h-7 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-amber-300 mb-1">新訂單流程</h3>
-              <p className="text-sm text-slate-300">
-                當有訂單時會推送到釘釘群，您可通過鏈接進入搶單頁面 →
-                確認接單 → 填寫最終報價同步給乘客
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                💡 平台零抽成，價格由您自行設定
-              </p>
+              <h3 className="font-bold text-cyan-300 mb-1 text-lg flex items-center gap-2">
+                進入接單大廳
+                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </h3>
+              <p className="text-sm text-slate-300">超過 1 小時無人搶的訂單會進入這裡，先搶先得</p>
+              <p className="text-xs text-slate-400 mt-1">💡 平台零抽成，價格由您自行設定</p>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* 統計卡片 */}
         <div className="grid grid-cols-3 gap-3">

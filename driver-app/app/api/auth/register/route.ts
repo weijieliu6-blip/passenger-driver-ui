@@ -16,9 +16,11 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { method, password, name, role: requestedRole } = body
+    const { method, password, name } = body
 
-    const userRole: 'passenger' | 'driver' = requestedRole === 'driver' ? 'driver' : 'passenger'
+    // 角色永遠由伺服器端決定為 'passenger'。
+    // 司機註冊必須走招募審核流程（/api/driver-recruit + 後台審核 + 新增司機帳號）。
+    const userRole: 'passenger' = 'passenger'
 
     if (!password || !name || !method) {
       return NextResponse.json(
@@ -189,25 +191,6 @@ export async function POST(request: NextRequest) {
         .eq('id', userId)
     }
 
-    // 如果是司機，還需要創建 driver_info 記錄（drivers_profile 已廢棄）
-    if (userRole === 'driver') {
-      await new Promise(resolve => setTimeout(resolve, 300))
-      try {
-        await supabaseAdmin
-          .from('driver_info')
-          .upsert({
-            id: userId,
-            vehicle_plate: '待補充',
-            vehicle_model: '待補充',
-            driving_years: 0,
-            rating: 5.0,
-            membership_tier: 'gold'
-          }, { onConflict: 'id' })
-      } catch (e: any) {
-        console.warn('[register] 創建 driver_info 失敗:', e.message)
-      }
-    }
-
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email: authEmail,
       password
@@ -257,7 +240,7 @@ export async function POST(request: NextRequest) {
 
     const cookieOptions = {
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const,
       maxAge: 60 * 60 * 24 * 7,
       path: '/'

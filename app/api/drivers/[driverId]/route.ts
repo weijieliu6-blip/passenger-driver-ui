@@ -88,13 +88,12 @@ export async function GET(
       driver: {
         id: user.id,
         name: user.name,
-        phone: user.phone,
+        // H3：對外僅回 masked 電話，不回明文
         maskedPhone: maskPhone(user.phone),
         avatarUrl: user.avatar_url,
         joinedAt: user.created_at,
 
         vehiclePlate: maskPlate(driverInfo?.vehicle_plate),
-        vehiclePlateFull: driverInfo?.vehicle_plate,
         vehicleModel: driverInfo?.vehicle_model || '未填寫',
         drivingYears: driverInfo?.driving_years ?? 0,
 

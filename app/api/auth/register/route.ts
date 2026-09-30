@@ -21,11 +21,13 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { method, password, name, role: requestedRole } = body
-    
-    // 默認角色為 'passenger'，可由請求指定 'driver'
-    const userRole: 'passenger' | 'driver' = requestedRole === 'driver' ? 'driver' : 'passenger'
-    
+    const { method, password, name } = body
+
+    // 角色永遠由伺服器端決定為 'passenger'。
+    // 司機註冊必須走招募審核流程（/api/driver-recruit + 後台審核 + 新增司機帳號），
+    // 不可由前端透過 body.role 升級——這是 critical 權限漏洞。
+    const userRole: 'passenger' = 'passenger'
+
     if (!password || !name || !method) {
       return NextResponse.json(
         { error: '缺少必填字段', message: '請填寫完整信息' },
@@ -258,7 +260,8 @@ export async function POST(request: NextRequest) {
     
     const cookieOptions = {
       httpOnly: true,
-      secure: false,
+      // 生產環境自動啟用 secure（H2）
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const,
       maxAge: 60 * 60 * 24 * 7,
       path: '/'

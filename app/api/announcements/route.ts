@@ -44,28 +44,31 @@ export async function GET(_request: NextRequest) {
   // 3) db（從 Supabase 拉啟用中的公告；失敗回傳空陣列）
   let db: Array<{ message: string; kind: string }> = []
   try {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://vuuamydahzhpajjdvokl.supabase.co'
-    const serviceRoleKey =
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
     if (serviceRoleKey) {
-      const supabase = createClient(supabaseUrl, serviceRoleKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('message, kind')
-        .eq('active', true)
-        .lte('starts_at', now.toISOString())
-        .or('ends_at.is.null,ends_at.gte.' + now.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(20)
+      if (!supabaseUrl) {
+        console.warn('[announcements] NEXT_PUBLIC_SUPABASE_URL 未設定，略過公告查詢')
+        // env 未設定就不查；db 仍會是空陣列
+      } else {
+        const supabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+        const { data, error } = await supabase
+          .from('announcements')
+          .select('message, kind')
+          .eq('active', true)
+          .lte('starts_at', now.toISOString())
+          .or('ends_at.is.null,ends_at.gte.' + now.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(20)
 
-      if (!error && data) {
-        db = data.map((row) => ({ message: row.message, kind: row.kind }))
-      } else if (error) {
-        console.warn('[announcements] 查詢公告失敗:', error.message)
+        if (!error && data) {
+          db = data.map((row) => ({ message: row.message, kind: row.kind }))
+        } else if (error) {
+          console.warn('[announcements] 查詢公告失敗:', error.message)
+        }
       }
     }
   } catch (err) {

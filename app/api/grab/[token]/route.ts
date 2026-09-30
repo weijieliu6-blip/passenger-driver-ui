@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyOrderGrabbed } from '@/lib/dingtalk'
 import { getCurrentDriver } from '@/lib/auth-server'
+import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 /**
  * 獲取訂單詳情（用於搶單頁面展示）
@@ -139,6 +140,16 @@ export async function POST(
       )
     }
 
+    // 1b. Rate limit（per-driver，與 driver/grab 一致）
+    const rl = rateLimit(`grab:${driver.id}`, RATE_LIMITS.grab)
+    if (!rl.allowed) {
+      const seconds = Math.ceil(rl.resetMs / 1000)
+      return NextResponse.json(
+        { success: false, error: `請求太頻繁，請於 ${seconds} 秒後重試` },
+        { status: 429, headers: { 'Retry-After': String(seconds) } }
+      )
+    }
+
     // 2. 從登入司機資料獲取姓名/電話/車牌
     const driverName = driver.name
     const driverPhone = driver.phone
@@ -156,7 +167,10 @@ export async function POST(
       )
     }
 
-    // 3. 並發安全的搶單更新
+    // 3. 並發安全的搶單更新 + 清空 grab_token 防止重用（H4）
+    // 注意：grab_token 欄位目前 NOT NULL + UNIQUE（migration 20260930 才會改），
+    //       因此這裡把 token 改成 '__CONSUMED__-<ts>-<rand>' 作為唯一 sentinel。
+    const consumedMarker = '__CONSUMED__-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
     const { data: order, error: updateError } = await supabaseAdmin
       .from('orders')
       .update({
@@ -168,6 +182,7 @@ export async function POST(
         grabbed_at: new Date().toISOString(),
         accepted_at: new Date().toISOString(),
         first_driver_offered_at: new Date().toISOString(),
+        grab_token: consumedMarker,
       })
       .eq('grab_token', token)
       .eq('status', 'pending')

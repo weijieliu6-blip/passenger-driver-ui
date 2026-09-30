@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MapPin, Calendar, Users, Luggage, Car, Phone, User, ArrowLeft, CheckCircle, AlertCircle, Baby } from 'lucide-react'
+import PricingBadge from '@/components/pricing-badge'
 
 export default function ConfirmPage() {
   const router = useRouter()
@@ -145,7 +146,8 @@ export default function ConfirmPage() {
         body: JSON.stringify({
           ...formData,
           departureTime: departureDateTime,
-          estimatedFare: estimatedFare ? Math.round((estimatedFare.minFare + estimatedFare.maxFare) / 2) : null
+          // 若後端會用 zone code 自動算，這裡就不送；前端概略估算也作為 fallback
+          estimatedFare: formData.estimatedFare || (estimatedFare ? Math.round((estimatedFare.minFare + estimatedFare.maxFare) / 2) : null)
         })
       })
       
@@ -344,12 +346,30 @@ export default function ConfirmPage() {
               <h2 className="text-lg font-semibold text-slate-100 mb-4 flex items-center gap-2">
                 💰 預估車資
               </h2>
-              <div className="text-center mb-4">
-                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 mb-2">
-                  HK$ {fare.minFare} - {fare.maxFare}
+
+              {/* 新功能：若兩端都有 POI zone，顯示精確估算（覆蓋舊的範圍估算） */}
+              {formData.pickupZoneCode && formData.dropoffZoneCode ? (
+                <div className="mb-4">
+                  <PricingBadge
+                    pickupZoneCode={formData.pickupZoneCode}
+                    dropoffZoneCode={formData.dropoffZoneCode}
+                    vehicleType={formData.vehicleType}
+                    departureTime={
+                      formData.departureDate && formData.departureTime
+                        ? `${formData.departureDate}T${formData.departureTime}:00+08:00`
+                        : null
+                    }
+                  />
                 </div>
-                <div className="text-sm text-slate-400">價格範圍僅供參考</div>
-              </div>
+              ) : (
+                <div className="text-center mb-4">
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 mb-2">
+                    HK$ {fare.minFare} - {fare.maxFare}
+                  </div>
+                  <div className="text-sm text-slate-400">價格範圍僅供參考</div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 p-4 bg-slate-900/30 rounded-lg">
                 <div className="text-center">
                   <div className="text-xs text-slate-400 mb-1">車型</div>

@@ -37,9 +37,7 @@ export async function POST(
     const passenger = await getCurrentPassenger(request)
 
     const isOwner =
-      passenger &&
-      ((order as any).passenger_id === passenger.id ||
-        order.passenger_phone === passenger.phone)
+      passenger && (order as any).passenger_id === passenger.id
 
     if (!isOwner) {
       return NextResponse.json(

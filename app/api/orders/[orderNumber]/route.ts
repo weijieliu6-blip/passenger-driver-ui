@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getCurrentPassenger, getCurrentDriver, getCurrentUser } from '@/lib/auth-server'
 
 /**
- * 查詢單個訂單詳情 API
+ * 查询单个订单详情 API
  * GET /api/orders/[orderNumber]
+ *
+ * 認證策略：
+ *   - 未登入：只回公開摘要（訂單號 + 狀態 + 車輛/時間/地址摘要，不含乘客姓名電話、司機姓名電話車牌）
+ *   - 已登入乘客：只能讀自己的訂單（passenger_id === passenger.id）
+ *   - 已登入司機：只能讀自己接的訂單（driver_id === driver.id）
+ *   - admin：可讀任意訂單
  */
 export async function GET(
   request: NextRequest,
@@ -29,7 +36,38 @@ export async function GET(
       throw error
     }
 
-    // 構造附加信息
+    // 認證與授權
+    const passenger = await getCurrentPassenger(request)
+    const driver = await getCurrentDriver(request)
+    const user = await getCurrentUser(request)
+
+    const isOwnerPassenger = !!passenger && order.passenger_id === passenger.id
+    const isOwnerDriver = !!driver && order.driver_id === driver.id
+    const isAdmin = user?.role === 'admin'
+
+    if (!isOwnerPassenger && !isOwnerDriver && !isAdmin) {
+      // 未登入或非相關人員：只回公開摘要
+      const publicSummary = {
+        orderNumber: order.order_number,
+        status: order.status,
+        direction: order.direction,
+        vehicleType: order.vehicle_type,
+        passengers: order.passengers,
+        departureTime: order.departure_time,
+        pickupLocation: order.pickup_location,
+        pickupArea: order.pickup_area,
+        dropoffLocation: order.dropoff_location,
+        dropoffArea: order.dropoff_area,
+        createdAt: order.created_at,
+      }
+      return NextResponse.json({
+        success: true,
+        order: publicSummary,
+        readScope: 'public',
+      })
+    }
+
+    // 構造附加信息（已通過授權）
     const orderInfo: any = {
       ...order,
     }
@@ -65,6 +103,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       order: orderInfo,
+      readScope: isOwnerPassenger ? 'passenger' : isOwnerDriver ? 'driver' : 'admin',
     })
   } catch (error: any) {
     console.error('查詢訂單失敗:', error)

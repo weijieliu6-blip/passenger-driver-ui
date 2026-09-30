@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { notifyOrderAcceptedByPassenger } from '@/lib/dingtalk'
+import { getCurrentPassenger } from '@/lib/auth-server'
 
 /**
  * 乘客確認接單（接受司機報價）API
@@ -10,6 +11,8 @@ import { notifyOrderAcceptedByPassenger } from '@/lib/dingtalk'
  * - 從 price_confirmed → completed（乘客確認即視為成交）
  * - 記錄 completed_at 時間
  * - **推送釘釘通知**給司機 / 群組
+ *
+ * 認證：必須登入乘客本人（passenger_id === passenger.id）
  */
 export async function POST(
   request: NextRequest,
@@ -18,10 +21,19 @@ export async function POST(
   try {
     const { orderNumber } = await params
 
-    // 查詢訂單完整資料（用於推送通知）
+    // 認證
+    const passenger = await getCurrentPassenger(request)
+    if (!passenger) {
+      return NextResponse.json(
+        { success: false, error: '請先登入', code: 'AUTH_REQUIRED' },
+        { status: 401 }
+      )
+    }
+
+    // 查詢訂單
     const { data: order, error: fetchErr } = await supabaseAdmin
       .from('orders')
-      .select('id, status, confirmed_price, price_currency, pickup_location, pickup_area, dropoff_location, dropoff_area, departure_time, passenger_name, passenger_phone, driver_name')
+      .select('id, passenger_id, status, confirmed_price, price_currency, pickup_location, pickup_area, dropoff_location, dropoff_area, departure_time, passenger_name, passenger_phone, driver_name')
       .eq('order_number', orderNumber)
       .single()
 
@@ -29,6 +41,14 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: '訂單不存在', message: '查無此訂單' },
         { status: 404 }
+      )
+    }
+
+    // 授權：僅本人可確認
+    if (order.passenger_id !== passenger.id) {
+      return NextResponse.json(
+        { success: false, error: '無權限操作此訂單' },
+        { status: 403 }
       )
     }
 

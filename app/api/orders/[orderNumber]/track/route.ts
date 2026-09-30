@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getCurrentPassenger, getCurrentDriver, getCurrentUser } from '@/lib/auth-server'
 
 interface OrderRow {
   order_number: string
@@ -17,6 +18,7 @@ interface OrderRow {
   departure_time: string
   passengers: number
   vehicle_type: string
+  passenger_id: string | null
 }
 
 interface DriverLocationRow {
@@ -37,24 +39,22 @@ interface RideEventRow {
 }
 
 /**
- * 乘客端行程追蹤（單筆訂單）
+ * 行程追蹤（單筆訂單）
  * GET /api/orders/[orderNumber]/track
  *
- * 認證：開放（含乘客匿名查詢）—— 因為追蹤頁往往透過訂單連結直接進入
- * （乘客查詢時通常使用訂單連結或 cookie；這裡不強制登入，但回傳時不洩漏司機電話）
+ * 認證與授權（v2）：
+ *   - 未登入：只回公開摘要（訂單基本資訊 + 狀態 + 行程時間地址），
+ *     **不**回司機公開資訊、即時位置、事件流水。
+ *   - 登入乘客：必須是訂單本人（passenger_id === passenger.id）
+ *   - 登入司機：必須是訂單的接單司機（driver_id === driver.id）
+ *   - admin：可看任意訂單完整內容
  *
- * 回傳：
- *   {
- *     orderNumber, status, pickupLocation, pickupArea, dropoffLocation, dropoffArea,
- *     driver: { id, name, plate, vehicleModel?, rating?, drivingYears?, avatarUrl? } | null,
- *     location: { lat, lng, heading?, speed?, updatedAt } | null,
- *     events: [{ id, eventType, actorRole, payload, createdAt }],
- *     pickupCoords?: { lat, lng, name },
- *     dropoffCoords?: { lat, lng, name }
- *   }
+ * 為什麼這樣改：先前版本無認證即可回傳司機公開資訊 + 即時經緯度 +
+ * 全部 ride_events（含司機訊息），攻擊者只要掃 ORD{YYYYMMDD}{3位}
+ * 就能拿到所有進行中訂單的敏感資訊。
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ orderNumber: string }> }
 ) {
   try {
@@ -63,14 +63,14 @@ export async function GET(
       return NextResponse.json({ error: '缺少 orderNumber' }, { status: 400 })
     }
 
-    // 訂單基本資訊
+    // 訂單基本資訊（含 passenger_id / driver_id）
     const { data: order, error: orderErr } = await supabaseAdmin
       .from('orders')
       .select(
         'order_number, status, driver_id, driver_name, driver_plate, driver_phone, ' +
           'pickup_location, pickup_area, dropoff_location, dropoff_area, ' +
           'completed_at, confirmed_price, price_currency, price_confirmed_at, ' +
-          'departure_time, passengers, vehicle_type'
+          'departure_time, passengers, vehicle_type, passenger_id'
       )
       .eq('order_number', orderNumber)
       .single<OrderRow>()
@@ -79,10 +79,44 @@ export async function GET(
     }
 
     const ord: OrderRow = order
+
+    // 認證與授權
+    const passenger = await getCurrentPassenger(request)
+    const driver = await getCurrentDriver(request)
+    const user = await getCurrentUser(request)
+    const isOwnerPassenger = !!passenger && ord.passenger_id === passenger.id
+    const isOwnerDriver = !!driver && ord.driver_id === driver.id
+    const isAdmin = user?.role === 'admin'
+    const isAuthorized = isOwnerPassenger || isOwnerDriver || isAdmin
+
+    const publicSummary: Record<string, unknown> = {
+      orderNumber: ord.order_number,
+      status: ord.status,
+      pickupLocation: ord.pickup_location,
+      pickupArea: ord.pickup_area,
+      dropoffLocation: ord.dropoff_location,
+      dropoffArea: ord.dropoff_area,
+      departureTime: ord.departure_time,
+      passengers: ord.passengers,
+      vehicleType: ord.vehicle_type,
+      price: ord.confirmed_price
+        ? { amount: ord.confirmed_price, currency: ord.price_currency }
+        : null,
+      completedAt: ord.completed_at,
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json(publicSummary, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      })
+    }
+
     const isDriverAssigned = ['grabbed', 'price_confirmed', 'completed'].includes(ord.status)
 
     // 司機公開資訊（不洩漏電話）
-    let driver: {
+    let driverInfo: {
       id: string
       name: string | null
       plate: string | null
@@ -107,7 +141,7 @@ export async function GET(
           rating: number | null
           driving_years: number | null
         }>()
-      driver = {
+      driverInfo = {
         id: ord.driver_id,
         name: ord.driver_name ?? profile?.name ?? null,
         plate: ord.driver_plate ?? info?.vehicle_plate ?? null,
@@ -162,22 +196,11 @@ export async function GET(
 
     return NextResponse.json(
       {
-        orderNumber: ord.order_number,
-        status: ord.status,
-        pickupLocation: ord.pickup_location,
-        pickupArea: ord.pickup_area,
-        dropoffLocation: ord.dropoff_location,
-        dropoffArea: ord.dropoff_area,
-        departureTime: ord.departure_time,
-        passengers: ord.passengers,
-        vehicleType: ord.vehicle_type,
-        price: ord.confirmed_price
-          ? { amount: ord.confirmed_price, currency: ord.price_currency }
-          : null,
-        completedAt: ord.completed_at,
-        driver,
+        ...publicSummary,
+        driver: driverInfo,
         location,
         events: normalizedEvents,
+        readScope: isOwnerPassenger ? 'passenger' : isOwnerDriver ? 'driver' : 'admin',
       },
       {
         headers: {

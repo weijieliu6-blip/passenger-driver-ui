@@ -8,6 +8,7 @@ import {
   CheckCircle2, X, Loader2, AlertCircle, Wallet, ShieldCheck,
   Calendar, Baby, FileText, Hash, ChevronRight, Star
 } from 'lucide-react'
+import OrderChat from '@/components/order-chat'
 
 interface DriverInfo {
   id: string
@@ -66,6 +67,15 @@ export default function OrderDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [accepting, setAccepting] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  useEffect(() => {
+    // 取得當前使用者 ID（用於聊天訊息高亮）
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => { if (d?.user?.id) setCurrentUserId(d.user.id) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetchOrder()
@@ -451,6 +461,15 @@ export default function OrderDetailPage() {
             客服專線 <a href="tel:+85200000000" className="text-cyan-400 hover:text-cyan-300">+852 0000 0000</a>
           </p>
         </div>
+
+        {/* 即時通訊（右下角浮動）— 僅有司機接單後才顯示 */}
+        {order.driver && currentUserId && (
+          <OrderChat
+            orderNumber={order.order_number}
+            currentUserId={currentUserId}
+            mode="floating"
+          />
+        )}
       </main>
     </div>
   )

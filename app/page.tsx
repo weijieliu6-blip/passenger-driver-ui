@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone, ClipboardList } from 'lucide-react'
+import { MapPin, Calendar, Users, Luggage, Car, CheckCircle, Clock, AlertCircle, Baby, User, Phone, ClipboardList, Search, Sparkles, ChevronDown } from 'lucide-react'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { useT } from '@/components/i18n-provider'
 import { getLocationsByArea } from '@/lib/location-coords'
+import LocationAutocomplete, { type Location as PoiLocation } from '@/components/location-autocomplete'
+import PricingBadge from '@/components/pricing-badge'
+import CsWidget from '@/components/cs-widget'
 
 // Leaflet 必須動態加載（瀏覽器 API only, 不能 SSR）
 const PickupMap = dynamic(() => import('@/components/pickup-map'), {
@@ -76,6 +79,13 @@ export default function HomePage() {
     passengerPhone: '', // 乘客電話
     passengerNotes: '', // 備註
   })
+
+  // === 新功能：精確上車點 + 估算價（可選） ===
+  const [pickupPoi, setPickupPoi] = useState<PoiLocation | null>(null)
+  const [pickupCustomAddress, setPickupCustomAddress] = useState<string | null>(null)
+  const [dropoffPoi, setDropoffPoi] = useState<PoiLocation | null>(null)
+  const [dropoffCustomAddress, setDropoffCustomAddress] = useState<string | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // 香港區域選項
   type AreaOption = { value: string; label: string; disabled?: boolean }
@@ -281,9 +291,9 @@ export default function HomePage() {
     for (let i = 0; i < 30; i++) {
       const date = new Date(today)
       date.setDate(today.getDate() + i)
-      const dateStr = date.toISOString().split('T')[0]
-      const displayStr = date.toLocaleDateString('zh-HK', { 
-        month: '2-digit', 
+      const dateStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`
+      const displayStr = date.toLocaleDateString('zh-HK', {
+        month: '2-digit',
         day: '2-digit',
         weekday: 'short'
       })
@@ -292,11 +302,39 @@ export default function HomePage() {
     return dates
   }
 
-  // 生成時間選項（每30分鐘一個選項）
+  // 取得當前時間（client-side，每分鐘更新一次）
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => {
+    setNow(new Date())
+    const interval = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // 生成時間選項（每30分鐘一個選項，依當前時間過濾）
+  // - 今日：只顯示 ≥ 當前時間 + 30 分鐘的時段
+  // - 未來日期：全 24 小時可選
+  const MIN_LEAD_MINUTES = 30  // 最少提前分鐘數
   const getTimeOptions = () => {
     const times = []
+    // 判斷選中的日期是否為今天
+    const isToday = (() => {
+      if (!formData.departureDate || !now) return false
+      const [y, m, d] = formData.departureDate.split('-').map(Number)
+      return y === now.getFullYear() && m === (now.getMonth() + 1) && d === now.getDate()
+    })()
+
+    // 計算今日的截止時間（現在 + 30 分鐘，向上取整到下一個 30 分鐘）
+    let minTotalMinutes = 0
+    if (isToday && now) {
+      minTotalMinutes = now.getHours() * 60 + now.getMinutes() + MIN_LEAD_MINUTES
+      // 向上取整到下一個 30 分鐘
+      minTotalMinutes = Math.ceil(minTotalMinutes / 30) * 30
+    }
+
     for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
+        const totalMinutes = hour * 60 + minute
+        if (isToday && totalMinutes < minTotalMinutes) continue
         const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
         times.push({ value: timeStr, label: timeStr })
       }
@@ -524,37 +562,52 @@ export default function HomePage() {
       return
     }
 
+    // 驗證出發時間不能在過去（最少提前 30 分鐘）
+    const departureDateTime = new Date(`${formData.departureDate}T${formData.departureTime}:00+08:00`)
+    const nowCheck = new Date()
+    const minLeadMs = 30 * 60 * 1000
+    if (departureDateTime.getTime() < nowCheck.getTime() + minLeadMs) {
+      alert(`❌ 出發時間不能早於當前時間 ${MIN_LEAD_MINUTES} 分鐘，請重新選擇`)
+      return
+    }
+
     // 验证孩童类型（如果勾选了孩童）
     if (formData.hasChild && !formData.childType) {
       alert('❌ 請選擇孩童年齡類型')
       return
     }
 
-    // ✅ 訪客模式：彈出註冊提示（推薦註冊，可選擇跳過繼續訪客預約）
+    // 強制要求乘客必須登入才能下單
+    if (authState === 'loading') {
+      return // 等待 auth 檢查完成
+    }
     if (authState === 'guest') {
-      const choice = window.confirm(
-        '👋 建議先註冊帳號！\n\n' +
-        '✅ 註冊好處：\n' +
-        '  • 即時查看訂單狀態、司機報價\n' +
-        '  • 訂單歷史 / 電子收據\n' +
-        '  • 一鍵聯繫客服\n' +
-        '  • 收藏常用路線\n\n' +
-        '📝 點「確定」前往註冊/登入\n' +
-        '📝 點「取消」以訪客身份繼續預約'
-      )
-      if (choice) {
-        // 把 formData 存到 sessionStorage，登入後可恢復
-        sessionStorage.setItem('pendingBooking', JSON.stringify(formData))
-        router.push('/passenger/login?redirect=/')
-        return
-      }
-      // 用戶選擇「以訪客身份繼續」→ 繼續
+      // 把 formData 存到 sessionStorage，登入後可恢復
+      sessionStorage.setItem('pendingBooking', JSON.stringify(formData))
+      router.push('/passenger/login?redirect=/')
+      return
     }
 
     console.log('✅ 驗證通過，跳轉到確認頁面')
 
-    // 將表單數據存儲到 localStorage 以便在確認頁面使用
-    localStorage.setItem('bookingData', JSON.stringify(formData))
+    // 將表單數據 + 新欄位（POI / 自訂地址）合併儲存
+    const fullBookingData = {
+      ...formData,
+      // 新功能欄位
+      pickupPoi: pickupPoi || null,
+      pickupCustomAddress: pickupCustomAddress || null,
+      dropoffPoi: dropoffPoi || null,
+      dropoffCustomAddress: dropoffCustomAddress || null,
+      pickupZoneCode: pickupPoi?.zone_code || null,
+      dropoffZoneCode: dropoffPoi?.zone_code || null,
+      pickupAddress: pickupPoi?.address_zh || pickupCustomAddress || null,
+      dropoffAddress: dropoffPoi?.address_zh || dropoffCustomAddress || null,
+      pickupLat: pickupPoi?.lat ? Number(pickupPoi.lat) : null,
+      pickupLng: pickupPoi?.lng ? Number(pickupPoi.lng) : null,
+      dropoffLat: dropoffPoi?.lat ? Number(dropoffPoi.lat) : null,
+      dropoffLng: dropoffPoi?.lng ? Number(dropoffPoi.lng) : null,
+    }
+    localStorage.setItem('bookingData', JSON.stringify(fullBookingData))
 
     // 跳轉到確認頁面
     router.push('/confirm')
@@ -1001,7 +1054,23 @@ export default function HomePage() {
                     id="departureDate"
                     required
                     value={formData.departureDate}
-                    onChange={(e) => setFormData({ ...formData, departureDate: e.target.value })}
+                    onChange={(e) => {
+                      const newDate = e.target.value
+                      // 若日期變更為今天，且原選時間 < 當前時間+30min，清空時間
+                      let newTime = formData.departureTime
+                      if (newTime && now) {
+                        const [y, m, d] = newDate.split('-').map(Number)
+                        const isNewDateToday = y === now.getFullYear() && m === (now.getMonth() + 1) && d === now.getDate()
+                        if (isNewDateToday) {
+                          const [hh, mm] = newTime.split(':').map(Number)
+                          const selectedMin = hh * 60 + mm
+                          const minMin = now.getHours() * 60 + now.getMinutes() + MIN_LEAD_MINUTES
+                          const minMinRounded = Math.ceil(minMin / 30) * 30
+                          if (selectedMin < minMinRounded) newTime = ''
+                        }
+                      }
+                      setFormData({ ...formData, departureDate: newDate, departureTime: newTime })
+                    }}
                     className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition"
                     suppressHydrationWarning
                   >
@@ -1028,6 +1097,30 @@ export default function HomePage() {
                     suppressHydrationWarning
                   >
                     <option value="">{t('form.time_placeholder')}</option>
+                    {/* 過去時段 disabled（給用戶視覺提示） */}
+                    {(() => {
+                      if (!formData.departureDate || !now) return null
+                      const [y, m, d] = formData.departureDate.split('-').map(Number)
+                      const isToday = y === now.getFullYear() && m === (now.getMonth() + 1) && d === now.getDate()
+                      if (!isToday) return null
+                      const minTotalMinutes = Math.ceil((now.getHours() * 60 + now.getMinutes() + MIN_LEAD_MINUTES) / 30) * 30
+                      const fullTimes = []
+                      for (let hour = 0; hour < 24; hour++) {
+                        for (let minute = 0; minute < 60; minute += 30) {
+                          const totalMinutes = hour * 60 + minute
+                          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+                          if (totalMinutes < minTotalMinutes) {
+                            fullTimes.push({ value: timeStr, label: timeStr, disabled: true })
+                          }
+                        }
+                      }
+                      return fullTimes.map((t) => (
+                        <option key={t.value} value={t.value} disabled className="text-slate-600">
+                          {t.label}（已過）
+                        </option>
+                      ))
+                    })()}
+                    {/* 可選時段 */}
                     {getTimeOptions().map((time) => (
                       <option key={time.value} value={time.value}>
                         {time.label}
@@ -1127,6 +1220,72 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* 新功能：精確上車/下車點 + 估算價格（可選） */}
+            <div className="border-t border-slate-700/50 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-sm font-medium text-cyan-400 hover:text-cyan-300 transition w-full"
+              >
+                <Sparkles className="w-4 h-4" />
+                {showAdvanced ? '收起' : '使用精確地點搜尋 + 系統估算價'}（可選）
+                <ChevronDown className={`w-4 h-4 ml-auto transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-4 space-y-4 animate-fadeIn">
+                  {/* 精確上車地點 */}
+                  <LocationAutocomplete
+                    label="🎯 精確上車地點（POI 搜尋或手動輸入）"
+                    region={formData.direction === 'hk_to_mainland' ? 'hk' : 'mainland'}
+                    value={pickupPoi}
+                    onSelect={(loc, custom) => {
+                      setPickupPoi(loc)
+                      setPickupCustomAddress(custom)
+                    }}
+                    placeholder="搜尋「中環」「福田口岸」或輸入詳細地址"
+                  />
+                  {pickupCustomAddress && !pickupPoi && (
+                    <div className="text-xs text-cyan-400 px-3">✓ 已記錄自訂地址：{pickupCustomAddress}</div>
+                  )}
+
+                  {/* 精確下車地點 */}
+                  <LocationAutocomplete
+                    label="🏁 精確下車地點（POI 搜尋或手動輸入）"
+                    region={formData.direction === 'hk_to_mainland' ? 'mainland' : 'hk'}
+                    value={dropoffPoi}
+                    onSelect={(loc, custom) => {
+                      setDropoffPoi(loc)
+                      setDropoffCustomAddress(custom)
+                    }}
+                    placeholder="搜尋「深圳北站」「旺角」或輸入詳細地址"
+                  />
+                  {dropoffCustomAddress && !dropoffPoi && (
+                    <div className="text-xs text-cyan-400 px-3">✓ 已記錄自訂地址：{dropoffCustomAddress}</div>
+                  )}
+
+                  {/* 系統估算價格 */}
+                  {pickupPoi && dropoffPoi && (
+                    <PricingBadge
+                      pickupZoneCode={pickupPoi.zone_code}
+                      dropoffZoneCode={dropoffPoi.zone_code}
+                      vehicleType={formData.vehicleType}
+                      departureTime={
+                        formData.departureDate && formData.departureTime
+                          ? new Date(`${formData.departureDate}T${formData.departureTime}:00+08:00`).toISOString()
+                          : null
+                      }
+                    />
+                  )}
+                  {(pickupPoi || dropoffPoi) && (!pickupPoi || !dropoffPoi) && (
+                    <div className="text-xs text-slate-500 italic">
+                      選擇兩端地點後顯示估算價格
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* 醒目的預約按鈕 */}
             <button
               type="submit"
@@ -1190,6 +1349,9 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* AI 客服 Widget（右下角浮動） */}
+      {authState === 'passenger' && <CsWidget mode="floating" />}
 
       {/* Footer - 免責聲明 */}
       <footer className="mt-12 mb-6 px-4 max-w-2xl mx-auto">

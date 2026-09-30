@@ -24,8 +24,11 @@ export async function PUT(
     const body = await request.json()
 
     // 使用 service role 確保有權限更新
-    const supabaseUrl = 'https://vuuamydahzhpajjdvokl.supabase.co'
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL 未設定')
+    }
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         autoRefreshToken: false,

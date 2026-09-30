@@ -8,6 +8,7 @@ import {
   CheckCircle, ArrowLeft, CreditCard, Luggage, Baby, Clock,
   LogOut, FileText, ShieldCheck, Navigation
 } from 'lucide-react'
+import OrderChat from '@/components/order-chat'
 
 interface Order {
   id: number
@@ -59,6 +60,14 @@ export default function DriverOrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [driver, setDriver] = useState<any>(null)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => { if (d?.user?.id) setCurrentUserId(d.user.id) })
+      .catch(() => {})
+  }, [])
 
   // 報價表單
   const [price, setPrice] = useState('')
@@ -518,6 +527,15 @@ export default function DriverOrderDetailPage() {
           </div>
         )}
       </main>
+
+      {/* 即時通訊（右下角浮動）— 有乘客資訊時顯示 */}
+      {order.passenger_name && currentUserId && (
+        <OrderChat
+          orderNumber={order.order_number}
+          currentUserId={currentUserId}
+          mode="floating"
+        />
+      )}
     </div>
   )
 }

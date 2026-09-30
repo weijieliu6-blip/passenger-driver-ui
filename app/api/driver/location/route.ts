@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getCurrentDriver } from '@/lib/auth-server'
 import type { DriverLocationPing } from '@/lib/driver-tracking'
+import { rateLimit, RATE_LIMITS, rateLimitResponse } from '@/lib/rate-limit'
 
 /**
  * 司機端上報即時位置（行車中每 15s 由 client 呼叫）
@@ -16,6 +17,11 @@ import type { DriverLocationPing } from '@/lib/driver-tracking'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit：位置回報。每 IP 60 req / 60s（司機每 15s 一次 = 4/min，留餘裕給重連）
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = rateLimit(`location:${ip}`, RATE_LIMITS.location)
+    if (!rl.allowed) return rateLimitResponse(rl.resetMs)
+
     const driver = await getCurrentDriver(request)
     if (!driver) {
       return NextResponse.json({ error: '未登入或非司機身份' }, { status: 401 })
